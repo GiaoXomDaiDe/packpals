@@ -1,50 +1,153 @@
-# Welcome to your Expo app 👋
+# 🚗 PackPals - AI-Powered Ride Sharing App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A modern React Native ride-sharing application with AI-powered driver recommendations, built with Expo and TypeScript.
 
-## Get started
+## ✨ Features
 
-1. Install dependencies
+- 🔐 **Authentication**: Secure user authentication with Clerk
+- 🗺️ **Real-time Maps**: Google Maps integration with live tracking
+- 🤖 **AI Driver Recommendations**: Smart driver suggestions based on user preferences
+- 💳 **Payment Integration**: Secure payments with Stripe
+- ⭐ **Rating System**: Driver and ride rating functionality
+- 📱 **Real-time Tracking**: Live location tracking during rides
+- 🎨 **Modern UI**: Beautiful interface with NativeWind (Tailwind CSS)
 
-   ```bash
-   npm install
-   ```
+## 🛠️ Tech Stack
 
-2. Start the app
+- **Frontend**: React Native with Expo
+- **Language**: TypeScript
+- **Routing**: Expo Router
+- **Authentication**: Clerk
+- **Database**: NeonDB (PostgreSQL)
+- **Payment**: Stripe
+- **Maps**: React Native Maps + Google Maps API
+- **State Management**: Zustand
+- **Styling**: NativeWind (Tailwind CSS for React Native)
 
-   ```bash
-   npx expo start
-   ```
+## 🚀 Getting Started
 
-In the output, you'll find options to open the app in a
+### Prerequisites
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Node.js (v18 or higher)
+- Expo CLI
+- iOS Simulator or Android Emulator
+- Google Maps API key
+- Stripe API keys
+- Clerk API keys
+- NeonDB connection
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Installation
 
-## Get a fresh project
-
-When you're ready, run:
-
+1. Clone the repository:
 ```bash
-npm run reset-project
+git clone https://github.com/yourusername/PackPals.git
+cd PackPals
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+2. Install dependencies:
+```bash
+npm install
+```
 
-## Learn more
+3. Set up environment variables:
+Create a `.env` file in the root directory and add your API keys:
+```env
+EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_key
+EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_key
+EXPO_PUBLIC_GOOGLE_API_KEY=your_google_maps_key
+DATABASE_URL=your_neon_db_url
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+4. Start the development server:
+```bash
+npm start
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+5. Run on your preferred platform:
+```bash
+# iOS
+npm run ios
 
-## Join the community
+# Android
+npm run android
 
-Join our community of developers creating universal apps.
+# Web
+npm run web
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## 🏗️ Project Structure
+
+```
+PackPals/
+├── app/                    # App screens (Expo Router)
+│   ├── (api)/             # API routes
+│   ├── (auth)/            # Authentication screens
+│   ├── (root)/            # Main app screens
+│   └── (tabs)/            # Tab navigation
+├── components/            # Reusable UI components
+├── lib/                   # Business logic & utilities
+├── types/                 # TypeScript type definitions
+├── store/                 # Global state management
+├── constants/             # App constants
+├── hooks/                 # Custom React hooks
+├── assets/                # Images, fonts, icons
+└── docs/                  # Documentation
+```
+
+## 🤖 AI Driver Recommendation System
+
+Our AI system learns from user behavior and provides personalized driver suggestions based on:
+
+- Distance and proximity
+- Driver ratings and reviews
+- Vehicle capacity and type
+- Time patterns and preferences
+- Weather and traffic conditions
+- User's ride history
+- Real-time demand and surge pricing
+
+## 📱 Screenshots
+
+[Add screenshots here]
+
+## 🔧 Configuration
+
+### Google Maps Setup
+1. Get a Google Maps API key from Google Cloud Console
+2. Enable the following APIs:
+   - Maps SDK for Android
+   - Maps SDK for iOS
+   - Places API
+   - Directions API
+
+### Stripe Setup
+1. Create a Stripe account
+2. Get your publishable and secret keys
+3. Configure webhooks for payment events
+
+### Clerk Setup
+1. Create a Clerk application
+2. Configure social logins (Google, Apple, etc.)
+3. Set up user metadata
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [Expo](https://expo.dev/)
+- UI inspired by modern ride-sharing apps
+- AI recommendations powered by custom algorithms
+
+---
+
+Video source: https://www.youtube.com/watch?v=kmy_YNhl0mw&t=174s

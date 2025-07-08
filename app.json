@@ -1,42 +1,58 @@
 {
-  "expo": {
-    "name": "FakeUber",
-    "slug": "FakeUber",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "fakeuber",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true
-    },
-    "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+    "expo": {
+        "android": {
+            "adaptiveIcon": {
+                "backgroundColor": "#ffffff",
+                "foregroundImage": "./assets/images/adaptive-icon.png"
+            },
+            "config": {
+                "googleMaps": {
+                    "apiKey": "AIzaSyBsp83irsJ382H1JJH5_PTKYA4PTgOm9V4"
+                }
+            }
+        },
+        "experiments": {
+            "typedRoutes": true
+        },
+        "icon": "./assets/images/icon.png",
+        "ios": {
+            "supportsTablet": true
+        },
+        "name": "FakeUber",
+        "newArchEnabled": true,
+        "orientation": "portrait",
+        "platforms": ["ios", "android"],
+        "plugins": [
+            [
+                "expo-router",
+                {
+                    "origin": "https://fakeuber.com/"
+                }
+            ],
+            [
+                "expo-location",
+                {
+                    "isAndroidBackgroundLocationEnabled": true,
+                    "isIosBackgroundLocationEnabled": true,
+                    "locationAlwaysAndWhenInUsePermission": "This app needs access to your location to provide real-time tracking for rides.",
+                    "locationAlwaysPermission": "This app needs access to your location in the background to provide real-time tracking for rides.",
+                    "locationWhenInUsePermission": "This app needs access to your location to provide real-time tracking for rides."
+                }
+            ]
+        ],
+        "scheme": "fakeuber",
+        "slug": "FakeUber",
+        "splash": {
+            "backgroundColor": "#2F80ED",
+            "image": "./assets/images/splash.png",
+            "resizeMode": "contain"
+        },
+        "userInterfaceStyle": "automatic",
+        "version": "1.0.0",
+        "web": {
+            "bundler": "metro",
+            "favicon": "./assets/images/favicon.png",
+            "output": "server"
         }
-      ]
-    ],
-    "experiments": {
-      "typedRoutes": true
     }
-  }
 }
