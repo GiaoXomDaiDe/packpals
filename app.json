@@ -18,7 +18,7 @@
         "ios": {
             "supportsTablet": true
         },
-        "name": "FakeUber",
+        "name": "PackPals",
         "newArchEnabled": true,
         "orientation": "portrait",
         "platforms": ["ios", "android"],
@@ -26,7 +26,7 @@
             [
                 "expo-router",
                 {
-                    "origin": "https://fakeuber.com/"
+                    "origin": "https://packpals.com/"
                 }
             ],
             [
@@ -34,14 +34,14 @@
                 {
                     "isAndroidBackgroundLocationEnabled": true,
                     "isIosBackgroundLocationEnabled": true,
-                    "locationAlwaysAndWhenInUsePermission": "This app needs access to your location to provide real-time tracking for rides.",
-                    "locationAlwaysPermission": "This app needs access to your location in the background to provide real-time tracking for rides.",
-                    "locationWhenInUsePermission": "This app needs access to your location to provide real-time tracking for rides."
+                    "locationAlwaysAndWhenInUsePermission": "This app needs access to your location to provide storage location services.",
+                    "locationAlwaysPermission": "This app needs access to your location in the background to provide storage location services.",
+                    "locationWhenInUsePermission": "This app needs access to your location to provide storage location services."
                 }
             ]
         ],
-        "scheme": "fakeuber",
-        "slug": "FakeUber",
+        "scheme": "packpals",
+        "slug": "PackPals",
         "splash": {
             "backgroundColor": "#2F80ED",
             "image": "./assets/images/splash.png",

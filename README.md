@@ -1,15 +1,15 @@
-# 🚗 PackPals - AI-Powered Ride Sharing App
+# � PackPals - Package Storage Management App
 
-A modern React Native ride-sharing application with AI-powered driver recommendations, built with Expo and TypeScript.
+A modern React Native application for package storage management, connecting storage renters with storage keepers. Built with Expo and TypeScript, integrated with PackPals backend API.
 
 ## ✨ Features
 
-- 🔐 **Authentication**: Secure user authentication with Clerk
-- 🗺️ **Real-time Maps**: Google Maps integration with live tracking
-- 🤖 **AI Driver Recommendations**: Smart driver suggestions based on user preferences
-- 💳 **Payment Integration**: Secure payments with Stripe
-- ⭐ **Rating System**: Driver and ride rating functionality
-- 📱 **Real-time Tracking**: Live location tracking during rides
+- 🔐 **Authentication**: Secure user authentication with JWT
+- 🗺️ **Storage Location Maps**: Google Maps integration for storage locations
+- 📦 **Storage Management**: Browse and book storage spaces
+- 💳 **Payment Integration**: Secure payments with VNPay
+- ⭐ **Rating System**: Rate storage providers and experiences
+- 📱 **Real-time Updates**: Live updates on storage availability
 - 🎨 **Modern UI**: Beautiful interface with NativeWind (Tailwind CSS)
 
 ## 🛠️ Tech Stack
@@ -17,9 +17,10 @@ A modern React Native ride-sharing application with AI-powered driver recommenda
 - **Frontend**: React Native with Expo
 - **Language**: TypeScript
 - **Routing**: Expo Router
-- **Authentication**: Clerk
-- **Database**: NeonDB (PostgreSQL)
-- **Payment**: Stripe
+- **Authentication**: JWT (integrated with PackPals backend)
+- **Backend**: ASP.NET Core 8.0 with Clean Architecture
+- **Database**: SQL Server (Azure)
+- **Payment**: VNPay
 - **Maps**: React Native Maps + Google Maps API
 - **State Management**: Zustand
 - **Styling**: NativeWind (Tailwind CSS for React Native)
@@ -39,18 +40,21 @@ A modern React Native ride-sharing application with AI-powered driver recommenda
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/yourusername/PackPals.git
 cd PackPals
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Set up environment variables:
 Create a `.env` file in the root directory and add your API keys:
+
 ```env
 EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_key
 EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_key
@@ -59,11 +63,13 @@ DATABASE_URL=your_neon_db_url
 ```
 
 4. Start the development server:
+
 ```bash
 npm start
 ```
 
 5. Run on your preferred platform:
+
 ```bash
 # iOS
 npm run ios
@@ -113,6 +119,7 @@ Our AI system learns from user behavior and provides personalized driver suggest
 ## 🔧 Configuration
 
 ### Google Maps Setup
+
 1. Get a Google Maps API key from Google Cloud Console
 2. Enable the following APIs:
    - Maps SDK for Android
@@ -121,11 +128,13 @@ Our AI system learns from user behavior and provides personalized driver suggest
    - Directions API
 
 ### Stripe Setup
+
 1. Create a Stripe account
 2. Get your publishable and secret keys
 3. Configure webhooks for payment events
 
 ### Clerk Setup
+
 1. Create a Clerk application
 2. Configure social logins (Google, Apple, etc.)
 3. Set up user metadata
@@ -150,4 +159,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Video source: https://www.youtube.com/watch?v=kmy_YNhl0mw&t=174s
+Video source: <https://www.youtube.com/watch?v=kmy_YNhl0mw&t=174s>
