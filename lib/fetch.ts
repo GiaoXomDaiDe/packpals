@@ -3,13 +3,34 @@ import { useCallback, useEffect, useState } from 'react'
 export const fetchAPI = async (url: string, options?: RequestInit) => {
     try {
         const response = await fetch(url, options)
+        const data = await response.json()
+        
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`)
+            // Return a standardized error response
+            return {
+                success: false,
+                message: data.message || `HTTP error! status: ${response.status}`,
+                statusCode: response.status,
+                data: null
+            }
         }
-        return await response.json()
+        
+        // Return a standardized success response
+        return {
+            success: true,
+            message: data.message || 'Success',
+            statusCode: response.status,
+            data: data
+        }
     } catch (error) {
         console.error('Fetch error:', error)
-        throw error
+        // Return a standardized error response for network/parsing errors
+        return {
+            success: false,
+            message: error instanceof Error ? error.message : 'Network error occurred',
+            statusCode: 0,
+            data: null
+        }
     }
 }
 

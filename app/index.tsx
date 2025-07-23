@@ -1,13 +1,42 @@
-import { useAuth } from '@clerk/clerk-expo'
 import { Redirect } from 'expo-router'
+import { useEffect, useState } from 'react'
 import 'react-native-get-random-values'
 
+import { authAPI } from '@/lib/api'
+import { useUserStore } from '@/store'
+
 const Page = () => {
-    // Register the headless task once when the component mounts
+    const { setUser } = useUserStore()
+    const [isLoading, setIsLoading] = useState(true)
+    const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-    const { isSignedIn } = useAuth()
+    useEffect(() => {
+        const checkAuthStatus = async () => {
+            try {
+                const isAuth = await authAPI.isAuthenticated()
+                if (isAuth) {
+                    const user = await authAPI.getUser()
+                    const token = await authAPI.getToken()
+                    if (user && token) {
+                        setUser(user, token)
+                        setIsAuthenticated(true)
+                    }
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error)
+            } finally {
+                setIsLoading(false)
+            }
+        }
 
-    if (isSignedIn) {
+        checkAuthStatus()
+    }, [setUser])
+
+    if (isLoading) {
+        return null // Or a loading spinner component
+    }
+
+    if (isAuthenticated) {
         return <Redirect href="/(root)/(tabs)/home" />
     }
 

@@ -1,6 +1,6 @@
-import { ClerkProvider } from '@clerk/clerk-expo'
-import { tokenCache } from '@clerk/clerk-expo/token-cache'
-import { StripeProvider } from '@stripe/stripe-react-native'
+import { useDeepLinking } from '@/hooks/useDeepLinking'
+import { NotificationProvider } from '@/lib/context/NotificationContext'
+import { QueryProvider } from '@/lib/query/provider'
 import { useFonts } from 'expo-font'
 import { SplashScreen, Stack } from 'expo-router'
 import { useEffect } from 'react'
@@ -10,16 +10,11 @@ import './global.css'
 
 SplashScreen.preventAutoHideAsync()
 
-const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY
-
-if (!clerkPublishableKey) {
-    throw new Error(
-        'EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is not set. Please set it in your .env file.'
-    )
-}
-
-LogBox.ignoreLogs(['Clerk:'])
+LogBox.ignoreLogs([])
 export default function RootLayout() {
+    // Initialize deep linking handler
+    useDeepLinking()
+    
     const [loaded] = useFonts({
         'Jakarta-Bold': require('../assets/fonts/PlusJakartaSans-Bold.ttf'),
         'Jakarta-ExtraBold': require('../assets/fonts/PlusJakartaSans-ExtraBold.ttf'),
@@ -40,16 +35,11 @@ export default function RootLayout() {
     }
 
     return (
-        <StripeProvider
-            publishableKey={
-                process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY as string
-            }
-            merchantIdentifier="merchant.identifier"
-            urlScheme="your-url-scheme"
-        >
-            <ClerkProvider
-                publishableKey={clerkPublishableKey}
-                tokenCache={tokenCache}
+        <QueryProvider>
+            <NotificationProvider
+                baseUrl="http://192.168.43.112:5000" // Updated to correct IP and port
+                autoConnect={true}
+                showAlerts={true}
             >
                 <Stack>
                     <Stack.Screen
@@ -65,7 +55,7 @@ export default function RootLayout() {
                         options={{ headerShown: false }}
                     />
                 </Stack>
-            </ClerkProvider>
-        </StripeProvider>
+            </NotificationProvider>
+        </QueryProvider>
     )
 }

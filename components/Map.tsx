@@ -4,14 +4,10 @@ import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps'
 import MapViewDirections from 'react-native-maps-directions'
 
 import { icons } from '@/constants'
-import { useFetch } from '@/lib/fetch'
-import {
-    calculateDriverTimes,
-    calculateRegion,
-    generateMarkersFromData,
-} from '@/lib/map'
-import { useDriverStore, useLocationStore } from '@/store'
-import { Driver, MarkerData } from '@/types/type'
+import { storageAPI } from '@/lib'
+import { calculateRegion } from '@/lib/map'
+import { StorageMarkerData } from '@/lib/types'
+import { useLocationStore, useStorageStore } from '@/store'
 
 const directionsAPI = process.env.EXPO_PUBLIC_GOOGLE_API_KEY
 
@@ -19,74 +15,75 @@ const Map = () => {
     const {
         userLongitude,
         userLatitude,
-        destinationLatitude,
-        destinationLongitude,
+        selectedStorageLatitude,
+        selectedStorageLongitude,
     } = useLocationStore()
-    const { selectedDriver, setDrivers } = useDriverStore()
+    const { selectedStorage, storages, setStorages } = useStorageStore()
 
-    const {
-        data: drivers,
-        loading,
-        error,
-    } = useFetch<Driver[]>('/(api)/driver')
-    const [markers, setMarkers] = useState<MarkerData[]>([])
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
-        if (Array.isArray(drivers)) {
-            if (!userLatitude || !userLongitude) return
+        fetchStorageLocations()
+    }, [userLatitude, userLongitude])
 
-            const newMarkers = generateMarkersFromData({
-                data: drivers,
-                userLatitude,
-                userLongitude,
+    const fetchStorageLocations = async () => {
+        if (!userLatitude || !userLongitude) return
+        
+        setLoading(true)
+        setError(null)
+        
+        try {
+            const response = await storageAPI.getAllStorages({
+                status: 'AVAILABLE',
+                limit: 50
             })
-
-            setMarkers(newMarkers)
+            
+            // Transform backend data to StorageMarkerData format
+            const transformedStorages: StorageMarkerData[] = response.data
+                .filter((storage: any) => storage.latitude && storage.longitude) // Only show storages with coordinates
+                .map((storage: any) => ({
+                    id: storage.id,
+                    title: storage.description || 'Storage Space',
+                    address: storage.address,
+                    latitude: storage.latitude,
+                    longitude: storage.longitude,
+                    status: storage.status,
+                    pricePerDay: storage.pricePerDay || 10,
+                    rating: storage.rating || 4.5,
+                    keeperName: storage.keeper?.user?.username || 'Unknown',
+                    images: storage.images || [],
+                    description: storage.description || 'Available storage space'
+                }))
+            
+            setStorages(transformedStorages)
+        } catch (err) {
+            console.error('Error fetching storage locations:', err)
+            setError('Failed to load storage locations')
+        } finally {
+            setLoading(false)
         }
-    }, [drivers, userLatitude, userLongitude])
+    }
 
-    useEffect(() => {
-        if (
-            markers.length > 0 &&
-            destinationLatitude !== undefined &&
-            destinationLongitude !== undefined
-        ) {
-            calculateDriverTimes({
-                markers,
-                userLatitude,
-                userLongitude,
-                destinationLatitude,
-                destinationLongitude,
-            }).then((drivers) => {
-                setDrivers(drivers as MarkerData[])
-            })
-        }
-    }, [
-        markers,
-        destinationLatitude,
-        destinationLongitude,
-        userLatitude,
-        userLongitude,
-        setDrivers,
-    ])
     const region = calculateRegion({
         userLatitude,
         userLongitude,
-        destinationLatitude,
-        destinationLongitude,
+        destinationLatitude: selectedStorageLatitude,
+        destinationLongitude: selectedStorageLongitude,
     })
 
     if (loading || (!userLatitude && !userLongitude))
         return (
-            <View className="flex justify-between items-center w-full">
-                <ActivityIndicator size="small" color="#000" />
+            <View className="flex justify-center items-center w-full h-full">
+                <ActivityIndicator size="small" color="#0286FF" />
+                <Text className="text-sm text-general-200 mt-2">Loading map...</Text>
             </View>
         )
 
     if (error)
         return (
-            <View className="flex justify-between items-center w-full">
-                <Text>Day la loi: {error}</Text>
+            <View className="flex justify-center items-center w-full h-full">
+                <Text className="text-sm text-red-500">{error}</Text>
             </View>
         )
 
@@ -99,51 +96,55 @@ const Map = () => {
                 borderRadius: 20,
             }}
             tintColor="black"
-            mapType="terrain"
+            mapType="standard"
             showsPointsOfInterest={false}
             initialRegion={region}
             showsUserLocation={true}
             userInterfaceStyle="light"
         >
-            {markers.map((marker, index) => (
+            {/* Storage Location Markers */}
+            {storages.map((storage) => (
                 <Marker
-                    key={marker.id}
+                    key={storage.id}
                     coordinate={{
-                        latitude: marker.latitude,
-                        longitude: marker.longitude,
+                        latitude: storage.latitude,
+                        longitude: storage.longitude,
                     }}
-                    title={marker.title}
+                    title={storage.title}
+                    description={`$${storage.pricePerDay}/day - ${storage.status}`}
                     image={
-                        selectedDriver === +marker.id
+                        selectedStorage === storage.id
                             ? icons.selectedMarker
                             : icons.marker
                     }
                 />
             ))}
 
-            {destinationLatitude && destinationLongitude && (
+            {/* Selected Storage Route */}
+            {selectedStorageLatitude && selectedStorageLongitude && userLatitude && userLongitude && (
                 <>
                     <Marker
-                        key="destination"
+                        key="selected-storage"
                         coordinate={{
-                            latitude: destinationLatitude,
-                            longitude: destinationLongitude,
+                            latitude: selectedStorageLatitude,
+                            longitude: selectedStorageLongitude,
                         }}
-                        title="Destination"
+                        title="Selected Storage"
                         image={icons.pin}
                     />
                     <MapViewDirections
                         origin={{
-                            latitude: userLatitude!,
-                            longitude: userLongitude!,
+                            latitude: userLatitude,
+                            longitude: userLongitude,
                         }}
                         destination={{
-                            latitude: destinationLatitude,
-                            longitude: destinationLongitude,
+                            latitude: selectedStorageLatitude,
+                            longitude: selectedStorageLongitude,
                         }}
                         apikey={directionsAPI!}
                         strokeColor="#0286FF"
-                        strokeWidth={2}
+                        strokeWidth={3}
+                        lineDashPattern={[1]}
                     />
                 </>
             )}

@@ -11,6 +11,7 @@ import google from '@/assets/icons/google.png'
 import home from '@/assets/icons/home.png'
 import list from '@/assets/icons/list.png'
 import lock from '@/assets/icons/lock.png'
+import locker from '@/assets/icons/locker.png'
 import map from '@/assets/icons/map.png'
 import marker from '@/assets/icons/marker.png'
 import out from '@/assets/icons/out.png'
@@ -69,6 +70,7 @@ export const icons = {
     star,
     target,
     to,
+    locker
 }
 
 export const onboarding = [

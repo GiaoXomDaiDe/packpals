@@ -1,15 +1,15 @@
-# � PackPals - Package Storage Management App
+# 📦 PackPals - Package Storage Management App
 
-A modern React Native application for package storage management, connecting storage renters with storage keepers. Built with Expo and TypeScript, integrated with PackPals backend API.
+A modern React Native application for package storage management, connecting storage renters with storage keepers. Built with Expo and TypeScript, integrated with PackPals .NET backend API.
 
 ## ✨ Features
 
-- 🔐 **Authentication**: Secure user authentication with JWT
+- 🔐 **Custom Authentication**: Secure user authentication with JWT tokens
 - 🗺️ **Storage Location Maps**: Google Maps integration for storage locations
 - 📦 **Storage Management**: Browse and book storage spaces
-- 💳 **Payment Integration**: Secure payments with VNPay
+- 💳 **Payment Integration**: Secure payments with VNPAY
 - ⭐ **Rating System**: Rate storage providers and experiences
-- 📱 **Real-time Updates**: Live updates on storage availability
+- 📱 **Role-based Access**: Separate flows for Renters and Keepers
 - 🎨 **Modern UI**: Beautiful interface with NativeWind (Tailwind CSS)
 
 ## 🛠️ Tech Stack
@@ -17,10 +17,10 @@ A modern React Native application for package storage management, connecting sto
 - **Frontend**: React Native with Expo
 - **Language**: TypeScript
 - **Routing**: Expo Router
-- **Authentication**: JWT (integrated with PackPals backend)
+- **Authentication**: Custom JWT (integrated with PackPals .NET backend)
 - **Backend**: ASP.NET Core 8.0 with Clean Architecture
-- **Database**: SQL Server (Azure)
-- **Payment**: VNPay
+- **Database**: SQL Server
+- **Payment**: VNPAY
 - **Maps**: React Native Maps + Google Maps API
 - **State Management**: Zustand
 - **Styling**: NativeWind (Tailwind CSS for React Native)
@@ -33,9 +33,8 @@ A modern React Native application for package storage management, connecting sto
 - Expo CLI
 - iOS Simulator or Android Emulator
 - Google Maps API key
-- Stripe API keys
-- Clerk API keys
-- NeonDB connection
+- PackPals .NET backend running
+- VNPAY merchant account (for payments)
 
 ### Installation
 
@@ -56,10 +55,9 @@ npm install
 Create a `.env` file in the root directory and add your API keys:
 
 ```env
-EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_key
-EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_key
 EXPO_PUBLIC_GOOGLE_API_KEY=your_google_maps_key
-DATABASE_URL=your_neon_db_url
+EXPO_PUBLIC_BACKEND_URL=https://localhost:7056/api
+EXPO_PUBLIC_VNPAY_MERCHANT_ID=your_vnpay_merchant_id
 ```
 
 4. Start the development server:
@@ -100,17 +98,21 @@ PackPals/
 └── docs/                  # Documentation
 ```
 
-## 🤖 AI Driver Recommendation System
+## 📦 Storage Management System
 
-Our AI system learns from user behavior and provides personalized driver suggestions based on:
+PackPals connects package senders (Renters) with storage providers (Keepers) through:
 
-- Distance and proximity
-- Driver ratings and reviews
-- Vehicle capacity and type
-- Time patterns and preferences
-- Weather and traffic conditions
-- User's ride history
-- Real-time demand and surge pricing
+**For Renters:**
+- Browse available storage locations
+- Book storage spaces for packages
+- Track package storage status
+- Rate storage experiences
+
+**For Keepers:**
+- Manage storage locations
+- Handle incoming orders
+- Confirm package receipts
+- Track earnings and ratings
 
 ## 📱 Screenshots
 
@@ -127,17 +129,18 @@ Our AI system learns from user behavior and provides personalized driver suggest
    - Places API
    - Directions API
 
-### Stripe Setup
+### VNPAY Setup
 
-1. Create a Stripe account
-2. Get your publishable and secret keys
-3. Configure webhooks for payment events
+1. Create a VNPAY merchant account
+2. Get your merchant ID and secure keys
+3. Configure payment webhooks and callbacks
 
-### Clerk Setup
+### Backend Setup
 
-1. Create a Clerk application
-2. Configure social logins (Google, Apple, etc.)
-3. Set up user metadata
+1. Clone and run the PackPals .NET backend
+2. Configure database connection
+3. Set up authentication JWT secrets
+4. Configure VNPAY payment integration
 
 ## 🤝 Contributing
 
@@ -154,8 +157,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - Built with [Expo](https://expo.dev/)
-- UI inspired by modern ride-sharing apps
-- AI recommendations powered by custom algorithms
+- UI inspired by modern storage and logistics apps
+- Payment processing powered by VNPAY
+- Maps integration with Google Maps Platform
 
 ---
 

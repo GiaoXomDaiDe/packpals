@@ -1,58 +1,70 @@
 {
-    "expo": {
-        "android": {
-            "adaptiveIcon": {
-                "backgroundColor": "#ffffff",
-                "foregroundImage": "./assets/images/adaptive-icon.png"
-            },
-            "config": {
-                "googleMaps": {
-                    "apiKey": "AIzaSyBsp83irsJ382H1JJH5_PTKYA4PTgOm9V4"
-                }
-            }
-        },
-        "experiments": {
-            "typedRoutes": true
-        },
-        "icon": "./assets/images/icon.png",
-        "ios": {
-            "supportsTablet": true
-        },
-        "name": "PackPals",
-        "newArchEnabled": true,
-        "orientation": "portrait",
-        "platforms": ["ios", "android"],
-        "plugins": [
-            [
-                "expo-router",
-                {
-                    "origin": "https://packpals.com/"
-                }
-            ],
-            [
-                "expo-location",
-                {
-                    "isAndroidBackgroundLocationEnabled": true,
-                    "isIosBackgroundLocationEnabled": true,
-                    "locationAlwaysAndWhenInUsePermission": "This app needs access to your location to provide storage location services.",
-                    "locationAlwaysPermission": "This app needs access to your location in the background to provide storage location services.",
-                    "locationWhenInUsePermission": "This app needs access to your location to provide storage location services."
-                }
-            ]
-        ],
-        "scheme": "packpals",
-        "slug": "PackPals",
-        "splash": {
-            "backgroundColor": "#2F80ED",
-            "image": "./assets/images/splash.png",
-            "resizeMode": "contain"
-        },
-        "userInterfaceStyle": "automatic",
-        "version": "1.0.0",
-        "web": {
-            "bundler": "metro",
-            "favicon": "./assets/images/favicon.png",
-            "output": "server"
+  "expo": {
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./assets/images/adaptive-icon.png"
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBsp83irsJ382H1JJH5_PTKYA4PTgOm9V4"
         }
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
+      ],
+      "package": "com.anonymous.PackPals"
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "icon": "./assets/images/icon.png",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.PackPals"
+    },
+    "name": "PackPals",
+    "newArchEnabled": true,
+    "orientation": "portrait",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://packpals.com/"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "isAndroidBackgroundLocationEnabled": true,
+          "isIosBackgroundLocationEnabled": true,
+          "locationAlwaysAndWhenInUsePermission": "This app needs access to your location to provide storage location services.",
+          "locationAlwaysPermission": "This app needs access to your location in the background to provide storage location services.",
+          "locationWhenInUsePermission": "This app needs access to your location to provide storage location services."
+        }
+      ]
+    ],
+    "scheme": "packpals",
+    "slug": "PackPals",
+    "splash": {
+      "backgroundColor": "#2F80ED",
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain"
+    },
+    "userInterfaceStyle": "automatic",
+    "version": "1.0.0",
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/images/favicon.png",
+      "output": "server"
     }
+  }
 }

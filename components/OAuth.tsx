@@ -1,53 +1,38 @@
-import { useAuth, useSSO } from '@clerk/clerk-expo'
-import { router } from 'expo-router'
-import { Alert, Image, Text, View } from 'react-native'
-
-import CustomButton from '@/components/CustomButton'
-import { icons } from '@/constants'
-import { googleOAuth } from '@/lib/auth'
+import { Alert, Text, TouchableOpacity, View } from 'react-native'
+import Ionicons from 'react-native-vector-icons/Ionicons'
 
 const OAuth = () => {
-    const { startSSOFlow } = useSSO()
-    const { signOut } = useAuth()
-
     const handleGoogleSignIn = async () => {
-        await signOut() // Ensure the user is signed out before starting SSO flow
-        const result = await googleOAuth(startSSOFlow)
-        console.log(result)
+        Alert.alert('Coming Soon', 'Google Sign-In will be available in the next update.')
+    }
 
-        if (result?.code === 'session_exists' || result.code === 'success') {
-            Alert.alert(
-                'Success',
-                'Session exists. Redirecting to home screen.'
-            )
-            router.replace('/(root)/(tabs)/home')
-        }
-
-        Alert.alert(result?.success ? 'Success' : 'Error', result?.message)
+    const handleAppleSignIn = async () => {
+        Alert.alert('Coming Soon', 'Apple Sign-In will be available in the next update.')
     }
 
     return (
-        <View>
-            <View className="flex flex-row justify-center items-center mt-4 gap-x-3">
-                <View className="flex-1 h-[1px] bg-general-100" />
-                <Text className="text-lg">Or</Text>
-                <View className="flex-1 h-[1px] bg-general-100" />
-            </View>
-
-            <CustomButton
-                title="Log In with Google"
-                className="mt-5 w-full shadow-none"
-                IconLeft={() => (
-                    <Image
-                        source={icons.google}
-                        resizeMode="contain"
-                        className="w-5 h-5 mx-2"
-                    />
-                )}
-                bgVariant="outline"
-                textVariant="primary"
+        <View className="space-y-3">
+            {/* Google Sign In */}
+            <TouchableOpacity
                 onPress={handleGoogleSignIn}
-            />
+                className="flex-row items-center justify-center bg-white border border-gray-300 py-3 px-4 rounded-lg"
+            >
+                <Ionicons name="logo-google" size={20} color="#4285F4" />
+                <Text className="text-gray-700 font-JakartaMedium ml-3">
+                    Continue with Google
+                </Text>
+            </TouchableOpacity>
+
+            {/* Apple Sign In */}
+            <TouchableOpacity
+                onPress={handleAppleSignIn}
+                className="flex-row items-center justify-center bg-black py-3 px-4 rounded-lg"
+            >
+                <Ionicons name="logo-apple" size={20} color="white" />
+                <Text className="text-white font-JakartaMedium ml-3">
+                    Continue with Apple
+                </Text>
+            </TouchableOpacity>
         </View>
     )
 }

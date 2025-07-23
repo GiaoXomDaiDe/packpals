@@ -48,13 +48,15 @@ const InputField = ({
                     >
                         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                             <View className="my-2 w-full">
-                                <Text
-                                    className={`text-lg font-JakartaSemiBold mb-3 ${labelStyle}`}
-                                >
-                                    {label}
-                                </Text>
+                                {label && (
+                                    <Text
+                                        className={`text-lg font-JakartaSemiBold mb-3 ${labelStyle}`}
+                                    >
+                                        {label}
+                                    </Text>
+                                )}
                                 <View
-                                    className={`flex flex-row justify-start items-center relative bg-neutral-100 rounded-full border border-neutral-100 focus:border-primary-500  ${containerStyle}`}
+                                    className={`flex flex-row justify-start items-center relative bg-gray-50 rounded-lg border ${error ? 'border-red-500' : 'border-gray-200'} focus:border-blue-500 ${containerStyle}`}
                                 >
                                     {icon && (
                                         <Image
@@ -66,15 +68,18 @@ const InputField = ({
                                         onChangeText={onChange}
                                         value={value}
                                         onBlur={onBlur}
-                                        className={`rounded-full p-4 font-JakartaSemiBold text-[15px] flex-1 ${inputStyle} text-left`}
+                                        className={`rounded-lg p-4 font-Jakarta text-[15px] flex-1 ${inputStyle} text-left`}
                                         secureTextEntry={secureTextEntry}
+                                        placeholderTextColor="#9ca3af"
                                         {...props}
                                     />
                                 </View>
-                                {/* Show lỗi */}
-                                <Text className="text-red-500 text-sm ml-5 mt-1">
-                                    {error?.message}
-                                </Text>
+                                {/* Show error message only if there is an error */}
+                                {error?.message && (
+                                    <Text className="text-red-500 text-sm mt-1">
+                                        {error.message}
+                                    </Text>
+                                )}
                             </View>
                         </TouchableWithoutFeedback>
                     </KeyboardAvoidingView>
@@ -92,13 +97,15 @@ const InputField = ({
         >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                 <View className="my-2 w-full">
-                    <Text
-                        className={`text-lg font-JakartaSemiBold mb-3 ${labelStyle}`}
-                    >
-                        {label}
-                    </Text>
+                    {label && (
+                        <Text
+                            className={`text-lg font-JakartaSemiBold mb-3 ${labelStyle}`}
+                        >
+                            {label}
+                        </Text>
+                    )}
                     <View
-                        className={`flex flex-row justify-start items-center relative bg-neutral-100 rounded-full border border-neutral-100 focus:border-primary-500  ${containerStyle}`}
+                        className={`flex flex-row justify-start items-center relative bg-gray-50 rounded-lg border border-gray-200 focus:border-blue-500 ${containerStyle}`}
                     >
                         {icon && (
                             <Image
@@ -107,8 +114,9 @@ const InputField = ({
                             />
                         )}
                         <TextInput
-                            className={`rounded-full p-4 font-JakartaSemiBold text-[15px] flex-1 ${inputStyle} text-left`}
+                            className={`rounded-lg p-4 font-Jakarta text-[15px] flex-1 ${inputStyle} text-left`}
                             secureTextEntry={secureTextEntry}
+                            placeholderTextColor="#9ca3af"
                             {...props}
                         />
                     </View>

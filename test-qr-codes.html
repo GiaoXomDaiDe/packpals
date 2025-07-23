@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PackPals Deeplink QR Codes</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px;
+            text-align: center;
+            background: #f5f5f5;
+        }
+        .qr-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px;
+            display: inline-block;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .qr-code {
+            margin: 10px 0;
+        }
+        h1 { color: #333; }
+        h3 { color: #666; margin: 10px 0; }
+        .url { 
+            font-size: 12px; 
+            color: #888; 
+            word-break: break-all;
+            margin-top: 10px;
+        }
+        .instructions {
+            background: #e3f2fd;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px;
+            text-align: left;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head>
+<body>
+    <h1>📱 PackPals Deeplink QR Codes</h1>
+    
+    <div class="instructions">
+        <h3>📋 Instructions:</h3>
+        <ol>
+            <li><strong>Install PackPals app</strong> on your physical device</li>
+            <li><strong>Scan QR code</strong> with your phone's camera</li>
+            <li><strong>Open the link</strong> in mobile browser</li>
+            <li><strong>Click "Return to PackPals App"</strong> button</li>
+            <li><strong>App should open</strong> and navigate to payment result</li>
+        </ol>
+    </div>
+
+    <div class="qr-container">
+        <h3>✅ Payment Success Test</h3>
+        <canvas id="successQR" class="qr-code"></canvas>
+        <div class="url" id="successUrl"></div>
+    </div>
+
+    <div class="qr-container">
+        <h3>❌ Payment Cancel Test</h3>
+        <canvas id="cancelQR" class="qr-code"></canvas>
+        <div class="url" id="cancelUrl"></div>
+    </div>
+
+    <div class="qr-container">
+        <h3>🔗 Direct Deeplink Test</h3>
+        <canvas id="deepLinkQR" class="qr-code"></canvas>
+        <div class="url" id="deepLinkUrl"></div>
+    </div>
+
+    <script>
+        // URLs to generate QR codes for
+        const baseUrl = 'https://3fea27d64506.ngrok-free.app';
+        
+        const urls = {
+            success: `${baseUrl}/payment/success?orderId=qr-test-success&orderCode=111111&status=PAID`,
+            cancel: `${baseUrl}/payment/cancel?orderId=qr-test-cancel&orderCode=222222&status=CANCELLED`,
+            deepLink: 'packpals://payment/success?orderId=direct-test&status=success&orderCode=333333'
+        };
+
+        // Generate QR codes
+        QRCode.toCanvas(document.getElementById('successQR'), urls.success, {
+            width: 200,
+            margin: 2,
+            color: {
+                dark: '#4CAF50',
+                light: '#FFFFFF'
+            }
+        });
+
+        QRCode.toCanvas(document.getElementById('cancelQR'), urls.cancel, {
+            width: 200,
+            margin: 2,
+            color: {
+                dark: '#FF5722',
+                light: '#FFFFFF'
+            }
+        });
+
+        QRCode.toCanvas(document.getElementById('deepLinkQR'), urls.deepLink, {
+            width: 200,
+            margin: 2,
+            color: {
+                dark: '#2196F3',
+                light: '#FFFFFF'
+            }
+        });
+
+        // Display URLs
+        document.getElementById('successUrl').textContent = urls.success;
+        document.getElementById('cancelUrl').textContent = urls.cancel;
+        document.getElementById('deepLinkUrl').textContent = urls.deepLink;
+    </script>
+</body>
+</html>

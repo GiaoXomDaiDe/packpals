@@ -1,10 +1,10 @@
 import { LocationService } from '@/services/LocationService'
-import { useUser } from '@clerk/clerk-expo'
+import { useUserStore } from '@/store'
 import { useEffect, useState } from 'react'
 import { Alert } from 'react-native'
 
 export const useDriverTracking = () => {
-    const { user } = useUser()
+    const { user } = useUserStore()
     const [isTracking, setIsTracking] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const locationService = LocationService.getInstance()

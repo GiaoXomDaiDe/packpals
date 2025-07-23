@@ -1,14 +1,21 @@
+import { AuthStore, AuthUser } from '@/lib/types/auth.types'
 import { create } from 'zustand'
 
-import { DriverStore, LocationStore, MarkerData } from '@/types/type'
+import {
+    CompletedOrder,
+    LocationStore,
+    OrderStore,
+    StorageMarkerData,
+    StorageStore
+} from '@/lib/types/type'
 
 export const useLocationStore = create<LocationStore>((set) => ({
     userLatitude: null,
     userLongitude: null,
     userAddress: null,
-    destinationLatitude: null,
-    destinationLongitude: null,
-    destinationAddress: null,
+    selectedStorageLatitude: null,
+    selectedStorageLongitude: null,
+    selectedStorageAddress: null,
     setUserLocation: ({
         latitude,
         longitude,
@@ -24,12 +31,12 @@ export const useLocationStore = create<LocationStore>((set) => ({
             userAddress: address,
         }))
 
-        const { selectedDriver, clearSelectedDriver } =
-            useDriverStore.getState()
-        if (selectedDriver) clearSelectedDriver()
+        const { selectedStorage, clearSelectedStorage } =
+            useStorageStore.getState()
+        if (selectedStorage) clearSelectedStorage()
     },
 
-    setDestinationLocation: ({
+    setSelectedStorageLocation: ({
         latitude,
         longitude,
         address,
@@ -39,65 +46,64 @@ export const useLocationStore = create<LocationStore>((set) => ({
         address: string
     }) => {
         set(() => ({
-            destinationLatitude: latitude,
-            destinationLongitude: longitude,
-            destinationAddress: address,
+            selectedStorageLatitude: latitude,
+            selectedStorageLongitude: longitude,
+            selectedStorageAddress: address,
         }))
-
-        const { selectedDriver, clearSelectedDriver } =
-            useDriverStore.getState()
-        if (selectedDriver) clearSelectedDriver()
     },
 
-    clearDestination: () =>
+    clearSelectedStorage: () =>
         set(() => ({
-            destinationLatitude: null,
-            destinationLongitude: null,
-            destinationAddress: null,
+            selectedStorageLatitude: null,
+            selectedStorageLongitude: null,
+            selectedStorageAddress: null,
         })),
 }))
 
-export const useDriverStore = create<DriverStore>((set) => ({
-    drivers: [] as MarkerData[],
-    selectedDriver: null,
-    setSelectedDriver: (driverId: number) =>
-        set(() => ({ selectedDriver: driverId })),
-    setDrivers: (drivers: MarkerData[]) => set(() => ({ drivers })),
-    clearSelectedDriver: () => set(() => ({ selectedDriver: null })),
+export const useStorageStore = create<StorageStore>((set) => ({
+    storages: [] as StorageMarkerData[],
+    selectedStorage: null,
+    setSelectedStorage: (storageId: string) =>
+        set(() => ({ selectedStorage: storageId })),
+    setStorages: (storages: StorageMarkerData[]) => set(() => ({ storages })),
+    clearSelectedStorage: () => set(() => ({ selectedStorage: null })),
 }))
 
-interface CompletedRide {
-    rideId: string
-    driverId: number
-    driverName: string
-    driverImage?: string
-    originAddress: string
-    destinationAddress: string
-    farePrice: number
-    completedAt: string
-    reviewed?: boolean
-}
-
-interface RideStore {
-    completedRide: CompletedRide | null
-    setCompletedRide: (ride: CompletedRide) => void
-    clearCompletedRide: () => void
-}
-
-export const useRideStore = create<RideStore>((set) => ({
-    completedRide: null,
-    setCompletedRide: (ride: CompletedRide) =>
-        set(() => ({ completedRide: ride })),
-    clearCompletedRide: () => set(() => ({ completedRide: null })),
+export const useOrderStore = create<OrderStore>((set) => ({
+    completedOrder: null,
+    setCompletedOrder: (order: CompletedOrder) =>
+        set(() => ({ completedOrder: order })),
+    clearCompletedOrder: () => set(() => ({ completedOrder: null })),
 }))
 
-// Global reset function to clear all ride-related state
-export const resetAllRideState = () => {
-    const { clearSelectedDriver } = useDriverStore.getState()
-    const { clearDestination } = useLocationStore.getState()
-    const { clearCompletedRide } = useRideStore.getState()
+// User store for authentication and user data using the imported AuthStore interface
+export const useUserStore = create<AuthStore>((set) => ({
+    user: null,
+    isAuthenticated: false,
+    token: null,
+    setUser: (user: AuthUser, token?: string) => 
+        set(() => ({ 
+            user, 
+            isAuthenticated: true,
+            token: token || null
+        })),
+    clearUser: () => 
+        set(() => ({ 
+            user: null, 
+            isAuthenticated: false,
+            token: null
+        })),
+    setToken: (token: string) =>
+        set(() => ({ token })),
+}))
 
-    clearSelectedDriver()
-    clearDestination()
-    clearCompletedRide()
+// Global reset function to clear all storage-related state
+export const resetAllStorageState = () => {
+    const { clearSelectedStorage } = useStorageStore.getState()
+    const { clearSelectedStorage: clearLocationStorage } = useLocationStore.getState()
+    const { clearCompletedOrder } = useOrderStore.getState()
+
+    clearSelectedStorage()
+    clearLocationStorage()
+    clearCompletedOrder()
 }

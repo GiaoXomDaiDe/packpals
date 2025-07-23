@@ -1,30 +1,18 @@
-import CustomButton from '@/components/CustomButton'
-import DatePicker from '@/components/DatePicker'
-import GenderPicker from '@/components/GenderPicker'
 import InputField from '@/components/InputField'
-import OAuth from '@/components/OAuth'
-import { icons, images } from '@/constants'
-import { fetchAPI } from '@/lib/fetch'
-import { SignUpSchema, SignUpSchemaType } from '@/schema/auth.schema'
-import {
-    isClerkAPIResponseError,
-    useSession,
-    useSignUp,
-} from '@clerk/clerk-expo'
-import { ClerkAPIError } from '@clerk/types'
+import { icons } from '@/constants'
+import { useRegister } from '@/lib/query/hooks/useAuthQueries'
+import { SignUpFormData, SignUpSchema } from '@/lib/schemas/auth.schema'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, router } from 'expo-router'
 import { useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
     Alert,
-    Image,
     Keyboard,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
     Text,
-    TextInput,
     TouchableOpacity,
     TouchableWithoutFeedback,
     View,
@@ -33,359 +21,286 @@ import { ReactNativeModal } from 'react-native-modal'
 import Ionicons from 'react-native-vector-icons/Ionicons'
 
 const SignUp = () => {
-    const form = useForm<SignUpSchemaType>({
+    const [openEye, setOpenEye] = useState(false)
+    const [showSuccessModal, setShowSuccessModal] = useState(false)
+    
+    const registerMutation = useRegister({
+        onSuccess: () => {
+            setShowSuccessModal(true)
+        },
+        onError: (error: any) => {
+            console.error('Registration error:', error)
+            
+            const errorMessage = error.message || 'Registration failed. Please try again.'
+            
+            if (errorMessage.toLowerCase().includes('email')) {
+                setError('email', { 
+                    type: 'server', 
+                    message: 'This email is already registered. Please use a different email.' 
+                })
+            } else if (errorMessage.toLowerCase().includes('username')) {
+                setError('username', { 
+                    type: 'server', 
+                    message: 'This username is already taken. Please choose a different username.' 
+                })
+            } else if (errorMessage.toLowerCase().includes('phone')) {
+                setError('phoneNumber', { 
+                    type: 'server', 
+                    message: 'This phone number is already registered.' 
+                })
+            } else if (errorMessage.toLowerCase().includes('password')) {
+                setError('password', { 
+                    type: 'server', 
+                    message: 'Password does not meet requirements.' 
+                })
+            } else {
+                Alert.alert('Registration Failed', errorMessage)
+            }
+        },
+        onMutate: () => {
+            clearAllErrors()
+        }
+    })
+    
+    const registerForm = useForm<SignUpFormData>({
         resolver: zodResolver(SignUpSchema),
         defaultValues: {
-            name: '',
+            username: '',
             email: '',
             password: '',
             confirmPassword: '',
-            dateOfBirth: '',
-            gender: undefined,
+            phoneNumber: '',
         },
     })
-    const { handleSubmit, setError } = form
-    const { isLoaded, signUp, setActive } = useSignUp()
-    const { session } = useSession()
-    const [openEye, setOpenEye] = useState(false)
-    const [showSuccessModal, setShowSuccessModal] = useState(false)
-    const [userData, setUserData] = useState({
-        name: '',
-        email: '',
-        dateOfBirth: '',
-        phoneNumber: '',
-        gender: undefined as
-            | 'male'
-            | 'female'
-            | 'other'
-            | 'prefer_not_to_say'
-            | undefined,
-    })
-    const [verification, setVerification] = useState({
-        state: 'default',
-        error: '',
-        code: '',
-    })
-    const [isVerifying, setIsVerifying] = useState(false) // Thêm trạng thái loading
+    const { handleSubmit, setError, clearErrors } = registerForm
 
     const toggleEye = () => setOpenEye((prev) => !prev)
 
-    const mapClerkErrorToFormField = (error: ClerkAPIError) => {
-        switch (error.meta?.paramName) {
-            case 'name':
-                return 'name'
-            case 'email_address':
-                return 'email'
-            case 'gender':
-                return 'gender'
-            case 'date_of_birth':
-                return 'dateOfBirth'
-            case 'password':
-                return 'password'
-            case 'confirm_password':
-                return 'confirmPassword'
-            default:
-                return 'root'
-        }
+    const clearAllErrors = () => {
+        clearErrors(['email', 'username', 'phoneNumber', 'password', 'confirmPassword'])
     }
 
-    const onSignUpPress = async (data: SignUpSchemaType) => {
-        console.log(data)
-        setUserData({
-            name: data.name,
+    const onSignUpPress = async (data: SignUpFormData) => {
+        registerMutation.mutate({
             email: data.email,
-            dateOfBirth: data.dateOfBirth,
-            phoneNumber: data.phoneNumber || '',
-            gender: data.gender,
+            password: data.password,
+            confirmPassword: data.confirmPassword,
+            username: data.username,
+            phoneNumber: data.phoneNumber,
         })
-        if (!isLoaded) return
-        if (session) {
-            Alert.alert(
-                'Info',
-                'You are already signed in. Please log out first.'
-            )
-            router.replace('/(root)/(tabs)/home')
-            return
-        }
-
-        try {
-            await signUp.create({
-                emailAddress: data.email,
-                password: data.password,
-            })
-            await signUp.prepareEmailAddressVerification({
-                strategy: 'email_code',
-            })
-            setVerification({ ...verification, state: 'pending' })
-        } catch (err: any) {
-            console.log('Lỗi chi tiết:', JSON.stringify(err, null, 2))
-            if (isClerkAPIResponseError(err)) {
-                err.errors.forEach((error) => {
-                    console.log('Error: ', JSON.stringify(error, null, 2))
-                    const fieldName = mapClerkErrorToFormField(error)
-                    setError(fieldName, {
-                        message: error.longMessage,
-                    })
-                })
-            }
-            if (err.errors[0].code === 'form_password_incorrect') {
-                Alert.alert(
-                    'Error',
-                    'Mật khẩu không đúng. Vui lòng thử lại hoặc sử dụng "Log In with Google" nếu bạn đã đăng ký qua Google.'
-                )
-            } else {
-                console.log('Error:', err.errors[0].longMessage)
-            }
-        }
-    }
-
-    const onPressVerify = async () => {
-        if (!isLoaded) return
-        setIsVerifying(true)
-        console.log('Verification code:', verification.code)
-        try {
-            const completeSignUp = await signUp.attemptEmailAddressVerification(
-                {
-                    code: verification.code,
-                }
-            )
-            if (completeSignUp.status === 'complete') {
-                console.log(userData)
-                await fetchAPI('/(api)/user', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        name: userData.name,
-                        email: userData.email,
-                        clerkId: completeSignUp.createdUserId,
-                        dateOfBirth: userData.dateOfBirth,
-                        phoneNumber: userData.phoneNumber,
-                        gender: userData.gender,
-                    }),
-                })
-                await setActive({ session: completeSignUp.createdSessionId })
-                setVerification({ ...verification, state: 'success' })
-            } else {
-                setVerification({
-                    ...verification,
-                    error: 'Verification failed. Please check the code or try again.',
-                    state: 'failed',
-                })
-                Alert.alert(
-                    'Error',
-                    'Verification failed. Please check the code or try again.'
-                )
-            }
-            console.log('đã xác minh thành công:', completeSignUp)
-        } catch (err: any) {
-            console.log(JSON.stringify(err, null, 2))
-            const errorMessage =
-                err.errors?.[0]?.longMessage ||
-                'Verification failed. Please try again.'
-            setVerification({
-                ...verification,
-                error: errorMessage,
-                state: 'failed',
-            })
-            Alert.alert('Error', errorMessage)
-        } finally {
-            setIsVerifying(false) // Kết thúc loading
-        }
     }
 
     return (
-        <FormProvider {...form}>
+        <FormProvider {...registerForm}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
             >
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                    <ScrollView className="flex-1 bg-white">
-                        <View className="flex-1 bg-white">
-                            <View className="relative w-full h-[250px]">
-                                <Image
-                                    source={images.signUpCar}
-                                    className="z-0 w-full h-[250px]"
-                                />
-                                <Text className="text-2xl text-black font-JakartaSemiBold absolute bottom-5 left-5">
-                                    Create Your Account
+                    <View className="flex-1 bg-white">
+                        <ScrollView 
+                            className="flex-1" 
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingBottom: 50 }}
+                        >
+                            {/* Simple Header */}
+                            <View className="items-center pt-16 pb-8">
+                                {/* Logo */}
+                                <Text className="text-2xl font-JakartaBold text-blue-600 mb-2">
+                                    PackPals
+                                </Text>
+                                
+                                {/* Title */}
+                                <Text className="text-lg font-JakartaMedium text-gray-700">
+                                    Create your account
                                 </Text>
                             </View>
-                            <View className="p-5">
-                                <InputField
-                                    name="name"
-                                    label="Name"
-                                    placeholder="Enter name"
-                                    icon={icons.person}
-                                    autoCapitalize="none"
-                                    textContentType="name"
-                                />
-                                <InputField
-                                    name="email"
-                                    label="Email"
-                                    placeholder="Enter email"
-                                    icon={icons.email}
-                                    textContentType="emailAddress"
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                />
-                                <DatePicker
-                                    name="dateOfBirth"
-                                    label="Date Of Birth"
-                                    placeholder="Select your date of birth"
-                                    icon={icons.person}
-                                />
-                                <InputField
-                                    name="phoneNumber"
-                                    label="Phone Number"
-                                    placeholder="Enter phone number (optional)"
-                                    icon={icons.person}
-                                    keyboardType="phone-pad"
-                                    textContentType="telephoneNumber"
-                                />
-                                <GenderPicker name="gender" label="Gender" />
-                                <View>
-                                    <InputField
-                                        name="password"
-                                        label="Password"
-                                        placeholder="Enter password"
-                                        icon={icons.lock}
-                                        secureTextEntry={!openEye}
-                                        autoCapitalize="none"
-                                        textContentType="password"
-                                    />
-                                    <TouchableOpacity
-                                        onPress={toggleEye}
-                                        className="absolute right-5 bottom-12"
-                                    >
-                                        <Ionicons
-                                            name={
-                                                openEye
-                                                    ? 'eye-outline'
-                                                    : 'eye-off-outline'
-                                            }
-                                            size={24}
-                                            color="#949494"
+
+                            {/* Form Container */}
+                            <View className="px-6">
+                                {/* Form Fields */}
+                                <View className="space-y-4">
+                                    <View>
+                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Username</Text>
+                                        <InputField
+                                            name="username"
+                                            label=""
+                                            placeholder="Enter your username"
+                                            icon={icons.person}
+                                            autoCapitalize="none"
+                                            textContentType="username"
                                         />
-                                    </TouchableOpacity>
-                                </View>
-                                <View>
-                                    <InputField
-                                        name="confirmPassword"
-                                        label="Confirm Password"
-                                        placeholder="Enter confirm password"
-                                        icon={icons.lock}
-                                        secureTextEntry={!openEye}
-                                        autoCapitalize="none"
-                                        textContentType="password"
-                                    />
-                                    <TouchableOpacity
-                                        onPress={toggleEye}
-                                        className="absolute right-5 bottom-12"
-                                    >
-                                        <Ionicons
-                                            name={
-                                                openEye
-                                                    ? 'eye-outline'
-                                                    : 'eye-off-outline'
-                                            }
-                                            size={24}
-                                            color="#949494"
+                                    </View>
+
+                                    <View>
+                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Email</Text>
+                                        <InputField
+                                            name="email"
+                                            label=""
+                                            placeholder="Enter your email"
+                                            icon={icons.email}
+                                            textContentType="emailAddress"
+                                            keyboardType="email-address"
+                                            autoCapitalize="none"
                                         />
-                                    </TouchableOpacity>
-                                </View>
-                                <CustomButton
-                                    title="Sign Up"
-                                    onPress={handleSubmit(onSignUpPress)}
-                                    className="mt-6"
-                                />
-                                <OAuth />
-                                <Link
-                                    href="/sign-in"
-                                    className="text-lg text-center text-general-200 mt-10 mb-5"
-                                >
-                                    Already have an account?
-                                    <Text className="text-primary-500">
-                                        Log In
-                                    </Text>
-                                </Link>
-                            </View>
-                            <ReactNativeModal
-                                isVisible={verification.state === 'pending'}
-                                onModalHide={() => {
-                                    if (verification.state === 'success')
-                                        setShowSuccessModal(true)
-                                }}
-                            >
-                                <View className="bg-white px-7 py-9 rounded-2xl min-h-[300px]">
-                                    <Text className="font-JakartaExtraBold text-2xl mb-2">
-                                        Verification
-                                    </Text>
-                                    <Text className="font-Jakarta mb-5">
-                                        We&apos;ve sent a verification code to
-                                        {userData.email}.
-                                    </Text>
-                                    <View className="my-2 w-full">
-                                        <Text className="text-lg font-JakartaSemiBold mb-3">
-                                            Code
-                                        </Text>
-                                        <View className="flex flex-row justify-start items-center relative bg-neutral-100 rounded-full border border-neutral-100 focus:border-primary-500">
-                                            <Image
-                                                source={icons.lock}
-                                                className="w-6 h-6 ml-4"
+                                    </View>
+
+                                    <View>
+                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Phone Number</Text>
+                                        <InputField
+                                            name="phoneNumber"
+                                            label=""
+                                            placeholder="Enter your phone number"
+                                            icon={icons.person}
+                                            keyboardType="phone-pad"
+                                            textContentType="telephoneNumber"
+                                        />
+                                    </View>
+
+                                    <View>
+                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Password</Text>
+                                        <View className="relative">
+                                            <InputField
+                                                name="password"
+                                                label=""
+                                                placeholder="Enter your password"
+                                                icon={icons.lock}
+                                                secureTextEntry={!openEye}
+                                                autoCapitalize="none"
+                                                textContentType="password"
                                             />
-                                            <TextInput
-                                                value={verification.code}
-                                                onChangeText={(code) =>
-                                                    setVerification({
-                                                        ...verification,
-                                                        code,
-                                                    })
-                                                }
-                                                placeholder="123456"
-                                                keyboardType="numeric"
-                                                className="rounded-full p-4 font-JakartaSemiBold text-[15px] flex-1 text-left"
-                                            />
+                                            <TouchableOpacity
+                                                onPress={toggleEye}
+                                                className="absolute right-4 top-2"
+                                                style={{
+                                                    height: 56, // Fixed height to match input field height
+                                                    justifyContent: 'center',
+                                                    alignItems: 'center',
+                                                    width: 24,
+                                                }}
+                                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                            >
+                                                <Ionicons
+                                                    name={openEye ? 'eye-outline' : 'eye-off-outline'}
+                                                    size={20}
+                                                    color="#9ca3af"
+                                                />
+                                            </TouchableOpacity>
                                         </View>
                                     </View>
-                                    {verification.error && (
-                                        <Text className="text-red-500 text-sm mt-1">
-                                            {verification.error}
-                                        </Text>
-                                    )}
-                                    <CustomButton
-                                        title="Verify Email"
-                                        onPress={onPressVerify}
-                                        className="mt-5 bg-success-500"
-                                        isLoading={isVerifying}
-                                    />
+
+                                    <View>
+                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Confirm Password</Text>
+                                        <View className="relative">
+                                            <InputField
+                                                name="confirmPassword"
+                                                label=""
+                                                placeholder="Confirm your password"
+                                                icon={icons.lock}
+                                                secureTextEntry={!openEye}
+                                                autoCapitalize="none"
+                                                textContentType="password"
+                                            />
+                                            <TouchableOpacity
+                                                onPress={toggleEye}
+                                                className="absolute right-4 top-2"
+                                                style={{
+                                                    height: 56, // Fixed height to match input field height
+                                                    justifyContent: 'center',
+                                                    alignItems: 'center',
+                                                    width: 24,
+                                                }}
+                                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                            >
+                                                <Ionicons
+                                                    name={openEye ? 'eye-outline' : 'eye-off-outline'}
+                                                    size={20}
+                                                    color="#9ca3af"
+                                                />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
                                 </View>
-                            </ReactNativeModal>
-                            <ReactNativeModal isVisible={showSuccessModal}>
-                                <View className="bg-white px-7 py-9 rounded-2xl min-h-[300px]">
-                                    <Image
-                                        source={images.check}
-                                        className="w-[110px] h-[110px] mx-auto my-5"
-                                    />
-                                    <Text className="text-3xl font-JakartaBold text-center">
-                                        Verified
+
+                                {/* Sign Up Button */}
+                                <TouchableOpacity
+                                    onPress={handleSubmit(onSignUpPress)}
+                                    disabled={registerMutation.isPending}
+                                    className="bg-blue-600 py-4 rounded-lg mt-6 mb-6"
+                                >
+                                    <Text className="text-white font-JakartaBold text-center text-base">
+                                        {registerMutation.isPending ? 'Creating Account...' : 'Sign Up'}
                                     </Text>
-                                    <Text className="text-base text-gray-400 font-Jakarta text-center mt-2">
-                                        You have successfully verified your
-                                        account.
+                                </TouchableOpacity>
+
+                                {/* Or Divider */}
+                                <View className="flex-row items-center mb-6">
+                                    <View className="flex-1 h-px bg-gray-300" />
+                                    <Text className="mx-4 text-gray-500 text-sm font-Jakarta">
+                                        or
                                     </Text>
-                                    <CustomButton
-                                        title="Browse Home"
+                                    <View className="flex-1 h-px bg-gray-300" />
+                                </View>
+
+                                {/* Social Login */}
+                                {/* <OAuth /> */}
+
+                                {/* Sign In Link */}
+                                <View className="items-center mb-8">
+                                    <Link href="/sign-in" asChild>
+                                        <TouchableOpacity>
+                                            <Text className="text-gray-600 text-center font-Jakarta">
+                                                Already have an account?{' '}
+                                                <Text className="text-blue-600 font-JakartaBold">
+                                                    Sign In
+                                                </Text>
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </Link>
+                                </View>
+                            </View>
+                        </ScrollView>
+
+                        {/* Success Modal */}
+                        <ReactNativeModal 
+                            isVisible={showSuccessModal}
+                            animationIn="slideInUp"
+                            animationOut="slideOutDown"
+                            backdropOpacity={0.5}
+                            backdropColor="#000"
+                            onBackdropPress={() => {}}
+                            onBackButtonPress={() => {}}
+                        >
+                            <View className="flex-1 justify-center px-6">
+                                <View className="bg-white rounded-2xl p-8 items-center">
+                                    <View className="w-20 h-20 bg-green-100 rounded-full items-center justify-center mb-6">
+                                        <Ionicons name="checkmark-circle" size={40} color="#10b981" />
+                                    </View>
+                                    
+                                    <Text className="text-2xl font-JakartaBold text-gray-900 text-center mb-3">
+                                        Account Created Successfully!
+                                    </Text>
+                                    
+                                    <Text className="text-gray-600 text-center mb-8 font-Jakarta leading-6">
+                                        Welcome to PackPals! Your account has been created successfully. Please sign in to continue.
+                                    </Text>
+                                    
+                                    <TouchableOpacity
                                         onPress={() => {
                                             setShowSuccessModal(false)
-                                            router.push('/(root)/(tabs)/home')
+                                            router.replace('/(auth)/sign-in')
                                         }}
-                                        className="mt-5"
-                                    />
+                                        className="bg-blue-600 py-4 px-8 rounded-lg w-full"
+                                    >
+                                        <Text className="text-white font-JakartaBold text-center text-base">
+                                            Continue to Sign In
+                                        </Text>
+                                    </TouchableOpacity>
                                 </View>
-                            </ReactNativeModal>
-                        </View>
-                    </ScrollView>
+                            </View>
+                        </ReactNativeModal>
+                    </View>
                 </TouchableWithoutFeedback>
             </KeyboardAvoidingView>
         </FormProvider>

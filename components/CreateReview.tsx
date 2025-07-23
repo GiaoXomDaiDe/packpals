@@ -1,7 +1,7 @@
 import CustomButton from '@/components/CustomButton'
 import StarRating from '@/components/StarRating'
 import { fetchAPI } from '@/lib/fetch'
-import { useUser } from '@clerk/clerk-expo'
+import { useUserStore } from '@/store'
 import React, { useState } from 'react'
 import { Alert, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { ReactNativeModal } from 'react-native-modal'
@@ -23,7 +23,7 @@ const CreateReview: React.FC<CreateReviewProps> = ({
     driverName = 'Driver',
     onReviewCreated,
 }) => {
-    const { user } = useUser()
+    const { user } = useUserStore()
     const [rating, setRating] = useState(0)
     const [reviewText, setReviewText] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
