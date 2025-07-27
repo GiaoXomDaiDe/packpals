@@ -21,6 +21,14 @@ export default function PaymentResult() {
     const [paymentStatus, setPaymentStatus] = useState<'checking' | 'success' | 'failed' | 'cancelled'>('checking')
     const [orderUpdated, setOrderUpdated] = useState(false)
 
+    // Log deep link parameters for debugging
+    useEffect(() => {
+        console.log('🔗 Payment result deep link received:')
+        console.log('- Order ID:', orderId)
+        console.log('- Order Code:', orderCode)
+        console.log('- Status:', status)
+    }, [orderId, orderCode, status])
+
     // Mutations for updating order
     const markOrderAsPaidMutation = useMarkOrderAsPaid({
         onSuccess: () => {

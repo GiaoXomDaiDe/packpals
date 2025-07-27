@@ -38,7 +38,7 @@ class SignalRService {
    * Initialize SignalR connection
    * @param baseUrl - Backend server URL (e.g., 'http://localhost:5111')
    */
-  async initialize(baseUrl: string = 'http://192.168.43.112:5000'): Promise<boolean> {
+  async initialize(baseUrl: string = 'http://192.168.1.43:5000'): Promise<boolean> {
     try {
       if (this.connection?.state === 'Connected') {
         console.log('SignalR already connected');

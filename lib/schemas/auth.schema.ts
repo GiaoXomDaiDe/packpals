@@ -5,7 +5,12 @@ export const SignUpSchema = z.object({
     username: z.string().min(3, 'Username must be at least 3 characters'),
     email: z.string().email('Please enter a valid email'),
     phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits'),
-    password: z.string().min(8, 'Password must be at least 8 characters'),
+    password: z.string()
+        .min(8, 'Password must be at least 8 characters')
+        .regex(/[A-Z]/, 'Password must contain at least 1 uppercase letter')
+        .regex(/[a-z]/, 'Password must contain at least 1 lowercase letter')
+        .regex(/\d/, 'Password must contain at least 1 number')
+        .regex(/[@#$%^&*!_]/, 'Password must contain at least 1 special character (@#$%^&*!_)'),
     confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",

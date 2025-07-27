@@ -1,3 +1,4 @@
+import * as AuthSession from 'expo-auth-session'
 import apiClient from '../config/axios.config'
 
 export interface PayOSPaymentRequest {
@@ -9,6 +10,21 @@ export interface PayOSPaymentRequest {
   orderId: string
   buyerEmail?: string
   buyerPhone?: string
+}
+
+// Helper function to generate redirect URLs for Expo Auth Session
+export const getPaymentUrls = (orderId: string, orderCode?: string) => {
+  const redirectUri = AuthSession.makeRedirectUri({
+    scheme: 'packpals',
+    path: 'payment-result'
+  })
+
+  console.log('🔗 Payment redirect URI:', redirectUri)
+
+  return {
+    returnUrl: `${redirectUri}?orderId=${orderId}&orderCode=${orderCode || ''}&status=success`,
+    cancelUrl: `${redirectUri}?orderId=${orderId}&orderCode=${orderCode || ''}&status=cancelled`
+  }
 }
 
 export interface PayOSCreateTransactionRequest {
@@ -149,13 +165,17 @@ export class PayOSAPI {
   }
 
   /**
-   * Confirm webhook URL with PayOS
+   * Confirm webhook URL with PayOS for development environment
+   * Uses ngrok URL to receive payment notifications
    */
-  async confirmWebhook(webhookUrl: string): Promise<string> {
+  async confirmWebhook(webhookUrl?: string): Promise<string> {
     try {
-      console.log('🔗 Confirming PayOS webhook URL:', webhookUrl)
+      // Use ngrok URL for development webhook
+      const developmentWebhookUrl = webhookUrl || 'https://a169fb8b36f3.ngrok-free.app/api/payment/OS/webhook'
+      
+      console.log('🔗 Confirming PayOS webhook URL:', developmentWebhookUrl)
       const response = await apiClient.post(`${this.baseEndpoint}/confirm-webhook`, 
-        JSON.stringify(webhookUrl), 
+        JSON.stringify(developmentWebhookUrl), 
         {
           headers: { 'Content-Type': 'application/json' }
         }

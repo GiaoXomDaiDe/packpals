@@ -6,7 +6,7 @@
 
 // Different localhost alternatives for Android emulator
 export const ANDROID_ALTERNATIVES = [
-    'http://192.168.43.112:5000/api',      // Standard Android emulator
+    'http://192.168.1.43:5000/api',      // Standard Android emulator
     'http://localhost:5000/api',      // Sometimes works
     'http://127.0.0.1:5000/api',     // Alternative localhost
     'http://192.168.1.100:5000/api', // Replace with your IP

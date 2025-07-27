@@ -28,7 +28,7 @@ export interface UseSignalRReturn extends SignalRState {
 
 export const useSignalR = (options: UseSignalROptions = {}): UseSignalRReturn => {
   const {
-    baseUrl = 'http://192.168.43.112:5000',
+    baseUrl = 'http://192.168.1.43:5000',
     keeperId,
     autoConnect = true
   } = options;

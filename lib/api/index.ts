@@ -9,6 +9,7 @@ export { distanceAPI } from './distance.api'
 export { orderAPI } from './order.api'
 export { orderDetailsAPI } from './orderdetails.api'
 export { paymentAPI } from './payment.api'
+export { ratingAPI } from './rating.api'
 export { sizeAPI } from './size.api'
 export { storageAPI } from './storage.api'
 export { userAPI } from './user.api'
@@ -19,6 +20,7 @@ export { default as apiClient } from '../config/axios.config'
 // Export configuration and types
 export { API_ENDPOINTS, apiConfig, HTTP_STATUS, TIMEOUT_CONFIG } from '../config/config'
 
-// Re-export auth types for convenience
+// Re-export types for convenience
 export type * from '../types/auth.types'
+export type * from '../types/rating.types'
 

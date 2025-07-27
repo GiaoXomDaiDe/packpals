@@ -61,7 +61,7 @@ const StorageDetail = () => {
         isLoading: ordersLoading,
         error: ordersError,
         refetch: refetchOrders
-    } = useStorageOrders(id || '', {
+    } = useStorageOrders(id || '', {}, {
         enabled: !!id
     })
     

@@ -30,11 +30,12 @@ export class AuthAPI {
             console.log('🔐 Login API response:', { success: response.status >= 200, message: response.data.message })
             
             if (response.status >= 200 && response.status < 300) {
-                // Handle both formats: direct JWTToken or wrapped in { data: JWTToken }
-                const tokenData = response.data.data || response.data
+                // Handle nested response structure: response.data.data.data
+                const tokenData = response.data.data?.data || response.data.data || response.data
                 
                 // Validate token data structure
                 if (!tokenData || !tokenData.tokenString || !tokenData.id || !tokenData.email) {
+                    console.error('🔐 Invalid token data structure:', tokenData)
                     throw new Error('Invalid token data received from server')
                 }
                 
@@ -78,13 +79,28 @@ export class AuthAPI {
      */
     async register(userData: RegisterData): Promise<string> {
         try {
-            console.log('📝 Attempting registration with:', { 
-                email: userData.email, 
-                username: userData.username
-            })
+            console.log('📝 Attempting registration with full data:', userData)
+            console.log('📝 Data keys:', Object.keys(userData))
+            console.log('📝 Data values:', Object.values(userData))
             
-            const response = await apiClient.post(`${this.baseEndpoint}/register`, userData)
-            console.log('📝 Registration API response:', { success: response.status >= 200, message: response.data.message })
+            // Transform to match backend expectations (PascalCase)
+            const backendData = {
+                Email: userData.email,
+                Password: userData.password,
+                ConfirmPassword: userData.confirmPassword,
+                Username: userData.username,
+                PhoneNumber: userData.phoneNumber,
+            }
+            
+            console.log('📝 Sending backend data:', backendData)
+            
+            const response = await apiClient.post(`${this.baseEndpoint}/register`, backendData)
+            console.log('📝 Registration API response:', { 
+                success: response.status >= 200, 
+                status: response.status,
+                message: response.data.message,
+                data: response.data 
+            })
             
             if (response.status >= 200 && response.status < 300 && response.data.data) {
                 // Backend returns GUID string for successful registration
@@ -100,7 +116,26 @@ export class AuthAPI {
             
             // Handle different types of network errors
             if (error.code === 'NETWORK_ERROR' || error.message === 'Network Error') {
-                throw new Error('Cannot connect to server. Please check:\n• Backend server is running on port 5000\n• Network connection (Android: use 192.168.43.112, iOS: use localhost)\n• Firewall/antivirus not blocking the connection')
+                throw new Error('Cannot connect to server. Please check:\n• Backend server is running on port 5000\n• Network connection (Android: use  192.168.1.43, iOS: use localhost)\n• Firewall/antivirus not blocking the connection')
+            }
+            
+            // Handle backend validation errors
+            if (error.response && error.response.status === 400) {
+                const errorData = error.response.data
+                if (typeof errorData === 'string') {
+                    // Backend returns plain text error messages
+                    if (errorData.includes('Email đã tồn tại')) {
+                        throw new Error('Email already exists. Please use a different email.')
+                    } else if (errorData.includes('Mật khẩu không hợp lệ')) {
+                        throw new Error('Password must contain at least 8 characters, 1 uppercase, 1 lowercase, 1 number, and 1 special character (@#$%^&*!_)')
+                    } else if (errorData.includes('Xác nhận mật khẩu không khớp')) {
+                        throw new Error('Password confirmation does not match')
+                    } else {
+                        throw new Error(errorData)
+                    }
+                } else if (errorData.message) {
+                    throw new Error(errorData.message)
+                }
             }
             
             // Handle timeout errors
@@ -110,7 +145,23 @@ export class AuthAPI {
             
             // Handle specific API errors from backend
             if (error.response) {
+                console.log('📝 Backend error response:', {
+                    status: error.response.status,
+                    data: error.response.data,
+                    message: error.response.data?.message
+                })
+                
                 const errorMessage = error.response.data?.message || error.response.data?.title || 'Registration failed'
+                
+                // Check for specific errors
+                if (errorMessage.toLowerCase().includes('email')) {
+                    throw new Error('This email is already registered. Please use a different email.')
+                } else if (errorMessage.toLowerCase().includes('username')) {
+                    throw new Error('This username is already taken. Please choose a different username.')
+                } else if (errorMessage.toLowerCase().includes('phone')) {
+                    throw new Error('This phone number is already registered.')
+                }
+                
                 throw new Error(errorMessage)
             }
             

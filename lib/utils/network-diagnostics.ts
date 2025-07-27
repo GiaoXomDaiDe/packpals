@@ -43,7 +43,7 @@ export const getNetworkTroubleshootingTips = () => {
         '1. Make sure your backend server is running',
         '2. Check if the backend port is correct (7056)',
         '3. Verify firewall isn't blocking the connection',
-        '4. For Android emulator, use 192.168.43.112 instead of localhost',
+        '4. For Android emulator, use  192.168.1.43 instead of localhost',
         '5. For iOS simulator, localhost should work',
         '6. Try using your computer\'s IP address instead of localhost'
     ]

@@ -233,33 +233,56 @@ const BookStorage = () => {
                             Storage Information
                         </Text>
 
-                        {/* Storage Basic Info */}
-                        <View className="flex-row items-start mb-4">
-                            <Image
-                                source={{ uri: storageDetails.images[0] || 'https://via.placeholder.com/80' }}
-                                className="w-16 h-16 rounded-lg"
-                                resizeMode="cover"
-                            />
-                            <View className="flex-1 ml-3">
-                                <Text className="text-base font-JakartaBold text-gray-900 mb-1" numberOfLines={2}>
+                        {/* Storage Basic Info - Card Style Layout */}
+                        <View className="bg-white rounded-xl shadow-sm overflow-hidden mb-4">
+                            {/* Header Image */}
+                            <View className="relative">
+                                <Image
+                                    source={{ uri: storageDetails.images[0] || 'https://via.placeholder.com/400x200' }}
+                                    className="w-full h-40"
+                                    resizeMode="cover"
+                                />
+                                {/* Status Badge */}
+                                <View className="absolute top-3 right-3 bg-green-500 rounded-full px-3 py-1">
+                                    <Text className="text-white font-JakartaBold text-xs">
+                                        Available
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* Content Section */}
+                            <View className="p-4">
+                                {/* Title */}
+                                <Text className="text-xl font-JakartaBold text-gray-900 mb-3" numberOfLines={2}>
                                     {storageDetails.title}
                                 </Text>
-                                <View className="flex-row items-start mb-2">
-                                    <Ionicons name="location" size={14} color="#6b7280" className="mt-0.5" />
-                                    <Text className="text-sm text-gray-600 ml-1 flex-1" numberOfLines={3}>
+                                
+                                {/* Address */}
+                                <View className="flex-row items-start mb-4">
+                                    <View className="bg-blue-100 rounded-full p-2 mr-3 mt-0.5">
+                                        <Ionicons name="location" size={14} color="#007AFF" />
+                                    </View>
+                                    <Text className="text-sm text-gray-600 flex-1 leading-5" numberOfLines={3}>
                                         {storageDetails.address}
                                     </Text>
                                 </View>
-                                <View className="flex-row items-center justify-between">
-                                    <View className="flex-row items-center">
-                                        <Ionicons name="star" size={14} color="#f59e0b" />
-                                        <Text className="text-sm font-JakartaMedium text-gray-700 ml-1">
-                                            {storageDetails.rating?.toFixed(1)}
+                                
+                                {/* Rating Section */}
+                                <View className="flex-row items-center pt-3 border-t border-gray-100">
+                                    <View className="bg-yellow-100 rounded-lg p-2 mr-3">
+                                        <Ionicons name="star" size={16} color="#f59e0b" />
+                                    </View>
+                                    <View>
+                                        <Text className="text-xs text-gray-500 font-JakartaMedium">
+                                            Customer Rating
+                                        </Text>
+                                        <Text className="text-sm font-JakartaBold text-gray-800">
+                                            {storageDetails.rating && storageDetails.rating > 0 
+                                                ? `${storageDetails.rating.toFixed(1)}/5.0`
+                                                : 'No ratings yet'
+                                            }
                                         </Text>
                                     </View>
-                                    <Text className="text-base font-JakartaBold text-primary-600">
-                                        {storageDetails.pricePerDay.toLocaleString()} VND/day
-                                    </Text>
                                 </View>
                             </View>
                         </View>

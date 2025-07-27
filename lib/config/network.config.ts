@@ -13,13 +13,13 @@ const getLocalhostURL = (port: number = 5000) => {
     if (isExpoTunnel) {
         // When using Expo tunnel, we need to use the actual IP address
         // since tunnel creates a different network context
-        return `http://192.168.43.112:${port}`;
+        return `http://192.168.1.43:${port}`;
     }
     
     if (Platform.OS === 'android') {
         // Try different options for Android emulator
         // Option 1: Your computer's IP address
-        return `http://192.168.43.112:${port}`
+        return `http://192.168.1.43:${port}`
         
         // If above doesn't work, try these alternatives:
         // return `http://localhost:${port}`        // Sometimes works
@@ -44,7 +44,12 @@ export const BACKEND_PORTS = {
 // Network configuration
 export const NETWORK_CONFIG = {
     development: {
-        baseURL: getLocalhostURL(BACKEND_PORTS.DEV) + '/api',
+        // Use localhost instead of ngrok for better compatibility with Expo Go
+        baseURL: 'http://192.168.1.43:5000/api',
+        
+        // Option 2: Use ngrok if needed (updated URL)
+        // baseURL: 'https://a169fb8b36f3.ngrok-free.app/api',
+        
         timeout: 15000,
         enableLogging: true,
     },
@@ -63,7 +68,7 @@ export const NETWORK_CONFIG = {
 // Alternative localhost URLs for troubleshooting
 export const LOCALHOST_ALTERNATIVES = {
     android: [
-        'http://192.168.43.112:5000/api',  // Android emulator with HTTP
+        'http://192.168.1.43:5000/api',  // Android emulator with HTTP
         'http://192.168.1.100:5000/api',  // Replace with your actual IP
         'http://localhost:5000/api'
     ],

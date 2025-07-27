@@ -1,5 +1,6 @@
 import { authAPI } from './auth.api'
 import { orderAPI } from './order.api'
+import { ratingAPI } from './rating.api'
 import { storageAPI } from './storage.api'
 import { userAPI } from './user.api'
 
@@ -16,6 +17,7 @@ export class APIServiceFactory {
     public readonly storage = storageAPI
     public readonly order = orderAPI
     public readonly user = userAPI
+    public readonly rating = ratingAPI
 
     private constructor() {
         // Private constructor for singleton pattern
@@ -40,12 +42,14 @@ export class APIServiceFactory {
         storage: boolean
         order: boolean
         user: boolean
+        rating: boolean
     }> {
         const results = {
             auth: true,
             storage: true,
             order: true,
-            user: true
+            user: true,
+            rating: true
         }
 
         try {
@@ -63,5 +67,5 @@ export class APIServiceFactory {
 export const apiServices = APIServiceFactory.getInstance()
 
 // Export individual services for direct access (backward compatibility)
-export { authAPI, orderAPI, storageAPI, userAPI }
+export { authAPI, orderAPI, ratingAPI, storageAPI, userAPI }
 

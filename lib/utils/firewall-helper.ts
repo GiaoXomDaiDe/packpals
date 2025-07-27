@@ -5,7 +5,7 @@
 
 // Test if firewall is blocking the connection
 export const testFirewallBlocking = async () => {
-    const computerIP = '192.168.43.112'
+    const computerIP = ' 192.168.1.43'
     const port = 5000
     
     console.log('🔥 Testing if Windows Firewall is blocking connection...')
@@ -90,7 +90,7 @@ export const getFirewallSetupSteps = () => {
         '',
         'VERIFY SETUP:',
         '1. Open browser on your phone',
-        '2. Visit: http://192.168.43.112:5000',
+        '2. Visit: http://192.168.1.43:5000',
         '3. If you see backend response, firewall is configured correctly',
     ]
 }

@@ -1,18 +1,13 @@
-/**
- * API Test Utility
- * Helper to test backend connectivity and diagnose network issues
- */
-
 import { Platform } from 'react-native';
 import { apiConfig } from '../config/config';
 
 // Test different backend URLs
 const TEST_URLS = {
     current: apiConfig.baseURL,
-    android: 'http://192.168.43.112:7056/api',
-    ios: 'http://localhost:7056/api',
-    localhost: 'http://localhost:7056/api',
-    ip: 'http://192.168.1.100:7056/api' // Replace with your actual IP
+    android: 'http://192.168.1.43:5000/api',    // Updated to match current IP
+    ios: 'http://localhost:5000/api',           // Updated port to 5000
+    localhost: 'http://localhost:5000/api',     // Updated port to 5000
+    ip: 'http://192.168.1.100:5000/api' // Replace with your actual IP
 }
 
 // Test a single URL
@@ -51,8 +46,8 @@ export const testAllURLs = async (): Promise<void> => {
     
     console.log('\n💡 Troubleshooting tips:')
     console.log('1. Make sure backend server is running')
-    console.log('2. Check backend port (should be 7056)')
-    console.log('3. For Android emulator: use 192.168.43.112')
+    console.log('2. Check backend port (should be 5000)')
+    console.log('3. For Android emulator: use 192.168.1.43')
     console.log('4. For iOS simulator: use localhost')
     console.log('5. For physical device: use your computer\'s IP address')
     console.log('6. Check firewall/antivirus settings')
@@ -63,7 +58,6 @@ export const pingBackend = async (): Promise<boolean> => {
     try {
         const response = await fetch(apiConfig.baseURL.replace('/api', '/health') || apiConfig.baseURL, {
             method: 'GET',
-            timeout: 5000
         })
         return response.ok
     } catch (error) {

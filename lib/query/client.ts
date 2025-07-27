@@ -54,7 +54,9 @@ export const queryKeys = {
   orderList: (filters?: any) => ['orders', 'list', filters] as const,
   order: (orderId: string) => ['orders', orderId] as const,
   userOrders: (userId: string, filters?: any) => ['orders', 'user', userId, filters] as const,
+  keeperOrders: (keeperId: string, filters?: any) => ['orders', 'keeper', keeperId, filters] as const,
   storageOrders: (storageId: string, filters?: any) => ['orders', 'storage', storageId, filters] as const,
+  orderFinalAmount: (orderId: string) => ['orders', orderId, 'final-amount'] as const,
   
   // Order Details
   orderDetails: (orderId: string) => ['orderDetails', orderId] as const,
@@ -65,8 +67,11 @@ export const queryKeys = {
 
   // Ratings
   ratings: ['ratings'] as const,
-  storageRatings: (storageId: string) => ['ratings', 'storage', storageId] as const,
-  userRatings: (userId: string) => ['ratings', 'user', userId] as const,
+  rating: (ratingId: string) => ['ratings', ratingId] as const,
+  storageRatings: (storageId: string, query?: any) => ['ratings', 'storage', storageId, query] as const,
+  userRatings: (userId: string, query?: any) => ['ratings', 'user', userId, query] as const,
+  userStorageRating: (userId: string, storageId: string) => ['ratings', 'user', userId, 'storage', storageId] as const,
+  storageRatingStats: (storageId: string) => ['ratings', 'storage', storageId, 'stats'] as const,
 
   // Payment
   payment: ['payment'] as const,
@@ -92,6 +97,7 @@ export const invalidateQueries = {
   allOrders: () => queryClient.invalidateQueries({ queryKey: queryKeys.orders }),
   order: (orderId: string) => queryClient.invalidateQueries({ queryKey: queryKeys.order(orderId) }),
   userOrders: (userId: string) => queryClient.invalidateQueries({ queryKey: queryKeys.userOrders(userId) }),
+  keeperOrders: (keeperId: string) => queryClient.invalidateQueries({ queryKey: queryKeys.keeperOrders(keeperId) }),
   storageOrders: (storageId: string) => queryClient.invalidateQueries({ queryKey: queryKeys.storageOrders(storageId) }),
 
   // Invalidate order details
@@ -106,7 +112,19 @@ export const invalidateQueries = {
 
   // Invalidate ratings
   allRatings: () => queryClient.invalidateQueries({ queryKey: queryKeys.ratings }),
-  storageRatings: (storageId: string) => queryClient.invalidateQueries({ queryKey: queryKeys.storageRatings(storageId) }),
+  rating: (ratingId: string) => queryClient.invalidateQueries({ queryKey: queryKeys.rating(ratingId) }),
+  storageRatings: (storageId: string) => queryClient.invalidateQueries({ 
+    predicate: (query) => query.queryKey[0] === 'ratings' && query.queryKey[1] === 'storage' && query.queryKey[2] === storageId
+  }),
+  userRatings: (userId: string) => queryClient.invalidateQueries({ 
+    predicate: (query) => query.queryKey[0] === 'ratings' && query.queryKey[1] === 'user' && query.queryKey[2] === userId
+  }),
+  userStorageRating: (userId: string, storageId: string) => queryClient.invalidateQueries({ 
+    queryKey: queryKeys.userStorageRating(userId, storageId) 
+  }),
+  storageRatingStats: (storageId: string) => queryClient.invalidateQueries({ 
+    queryKey: queryKeys.storageRatingStats(storageId) 
+  }),
   
   // Invalidate PayOS
   allPayos: () => queryClient.invalidateQueries({ queryKey: queryKeys.payos }),

@@ -1,15 +1,3 @@
-import { Ride } from '@/types/type'
-
-export const sortRides = (rides: Ride[]): Ride[] => {
-    const result = rides.sort((a, b) => {
-        const dateA = new Date(`${a.created_at}T${a.ride_time}`)
-        const dateB = new Date(`${b.created_at}T${b.ride_time}`)
-        return dateB.getTime() - dateA.getTime()
-    })
-
-    return result.reverse()
-}
-
 export function formatTime(minutes: number): string {
     const formattedMinutes = Math.floor(minutes || 0)
 
@@ -43,4 +31,13 @@ export function formatDate(dateString: string): string {
     const year = date.getFullYear()
 
     return `${day < 10 ? '0' + day : day} ${month} ${year}`
+}
+
+export function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+    }).format(amount)
 }

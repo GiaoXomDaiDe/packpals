@@ -46,7 +46,7 @@ export class StorageAPI {
     // Get storages by keeper ID
     async getStoragesByKeeperId(keeperId: string) {
         try {
-            const response = await apiClient.get(`${this.baseEndpoint}/keeper/${keeperId}`)
+            const response = await apiClient.get(`${this.baseEndpoint}/keepers/${keeperId}/storages`)
             return response.data
         } catch (error: any) {
             if (error.response) {
@@ -134,7 +134,7 @@ export class StorageAPI {
     // Get total pending orders count for a keeper
     async getTotalPendingOrdersByKeeperId(keeperId: string) {
         try {
-            const response = await apiClient.get(`${this.baseEndpoint}/keeper/${keeperId}/pending-orders-count`)
+            const response = await apiClient.get(`${this.baseEndpoint}/keepers/${keeperId}/pending-orders-count`)
             return response.data
         } catch (error: any) {
             if (error.response) {

@@ -3,23 +3,22 @@
  * Special configuration for Expo apps running on physical devices
  */
 
-
 // Configuration for physical devices using Expo
 export const PHYSICAL_DEVICE_CONFIG = {
     // Your computer's IP address (found with ipconfig)
-    computerIP: '192.168.43.112',
+    computerIP: '192.168.1.43',
     
     // Backend port
     backendPort: 5000,
     
     // Full API URL for physical device
     getAPIURL: () => {
-        return `http://192.168.43.112:5000/api`
+        return `http://192.168.1.43:5000/api`
     },
     
     // Test URL without /api
     getTestURL: () => {
-        return `http://192.168.43.112:5000`
+        return `http://192.168.1.43:5000`
     }
 }
 
@@ -103,7 +102,7 @@ export const logPhysicalDeviceTroubleshooting = () => {
     console.log('1. Run testPhysicalDeviceConnection() to test')
     console.log('2. If it fails, check firewall settings')
     console.log('3. Try temporarily disabling Windows Firewall')
-    console.log('4. Test in browser: http://192.168.43.112:5000')
+    console.log('4. Test in browser: http://192.168.1.43:5000')
 }
 
 export default PHYSICAL_DEVICE_CONFIG

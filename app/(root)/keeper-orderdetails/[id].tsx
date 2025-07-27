@@ -3,22 +3,22 @@ import { ImageGallery } from '@/components/ImageGallery'
 import { OrderCertificationModal } from '@/components/OrderCertificationModal'
 import { icons } from '@/constants'
 import {
-  useOrder,
-  useOrderDetails,
-  useSetOrderStartTime,
-  useStorage,
-  useUpdateOrderStatus
+    useOrder,
+    useOrderDetails,
+    useSetOrderStartTime,
+    useStorage,
+    useUpdateOrderStatus
 } from '@/lib/query/hooks'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Image,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from 'react-native-vector-icons/Ionicons'

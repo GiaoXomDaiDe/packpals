@@ -5,7 +5,7 @@
 
 // Alternative URLs to try
 export const ALTERNATIVE_URLS = [
-    'http://192.168.43.112:5000/api',      // Standard Android emulator
+    'http://192.168.1.43:5000/api',      // Standard Android emulator
     'http://localhost:5000/api',      // Sometimes works on Android
     'http://127.0.0.1:5000/api',     // Alternative localhost
     'http://192.168.1.100:5000/api', // Replace with your IP

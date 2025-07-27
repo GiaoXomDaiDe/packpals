@@ -12,7 +12,7 @@ const CustomNavBar = () => {
     const tabs = [
         { name: 'home', title: 'Home', href: '/(root)/(tabs)/home' },
         { name: 'orders', title: 'Orders', href: '/(root)/(tabs)/orders' },
-        { name: 'chat', title: 'Reviews', href: '/(root)/(tabs)/chat' },
+        { name: 'reviews', title: 'Reviews', href: '/(root)/(tabs)/reviews' },
         { name: 'profile', title: 'Profile', href: '/(root)/(tabs)/profile' },
     ]
 
@@ -22,7 +22,7 @@ const CustomNavBar = () => {
                 return <Ionicons name="home-outline" size={18} color={color} />
             case 'orders':
                 return <Ionicons name="receipt-outline" size={20} color={color} />
-            case 'chat':
+            case 'reviews':
                 return <Ionicons name="star-outline" size={18} color={color} />
             case 'profile':
                 return <Ionicons name="person-outline" size={18} color={color} />
@@ -39,7 +39,7 @@ const CustomNavBar = () => {
                 return (
                     <TouchableOpacity
                         key={tab.name}
-                        onPress={() => router.push(tab.href)}
+                        onPress={() => router.push(tab.href as any)}
                         className={`flex flex-row justify-center items-center h-10 px-4 m-2 rounded-full ${
                             isFocused ? 'bg-[#fff]' : 'bg-transparent'
                         }`}
@@ -75,7 +75,7 @@ export default function RootLayout() {
                 options={{ title: 'Orders', headerShown: false }}
             />
             <Tabs.Screen
-                name="chat"
+                name="reviews"
                 options={{ title: 'Reviews', headerShown: false }}
             />
             <Tabs.Screen

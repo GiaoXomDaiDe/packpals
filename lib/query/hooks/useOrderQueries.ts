@@ -44,11 +44,32 @@ export function useUserOrders(
   })
 }
 
+// Keeper Orders Query
+export function useKeeperOrders(
+  keeperId: string,
+  query?: {
+    IsPaid?: boolean
+    Status?: string
+    PageIndex?: number
+    PageSize?: number
+  },
+  options?: Omit<UseQueryOptions, 'queryKey' | 'queryFn'>
+) {
+  return useQuery({
+    queryKey: queryKeys.keeperOrders(keeperId, query),
+    queryFn: () => orderAPI.getKeeperOrders(keeperId, query),
+    enabled: !!keeperId,
+    ...options,
+  })
+}
+
 export function useStorageOrders(
   storageId: string,
   query?: {
-    pageIndex?: number
-    pageSize?: number
+    IsPaid?: boolean
+    Status?: string
+    PageIndex?: number
+    PageSize?: number
   },
   options?: Omit<UseQueryOptions<StorageOrdersApiResponse>, 'queryKey' | 'queryFn'>
 ) {
@@ -106,6 +127,7 @@ export function useUpdateOrderStatus(
     orderId: string
     status: string
     storageId?: string
+    renterId?: string // Add renterId for proper invalidation
     orderCertification?: string[]
   }>
 ) {
@@ -113,6 +135,7 @@ export function useUpdateOrderStatus(
     orderId: string
     status: string
     storageId?: string
+    renterId?: string
     orderCertification?: string[]
   }>({
     mutationFn: ({ orderId, status, orderCertification }: { 
@@ -138,6 +161,11 @@ export function useUpdateOrderStatus(
         invalidateQueries.storageOrders(variables.storageId)
       }
       invalidateQueries.allOrders()
+      
+      // 🔄 IMPORTANT: Invalidate user orders to refresh My Orders tab
+      if (variables.renterId) {
+        invalidateQueries.userOrders(variables.renterId)
+      }
     },
     onError: (error, variables) => {
       // Revert optimistic update on error
@@ -152,6 +180,7 @@ export function useMarkOrderAsPaid(
   options?: UseMutationOptions<any, Error, {
     orderId: string
     storageId?: string
+    renterId?: string // Add renterId for proper invalidation
   }>
 ) {
   return useMutation({
@@ -168,6 +197,11 @@ export function useMarkOrderAsPaid(
         invalidateQueries.storageOrders(variables.storageId)
       }
       invalidateQueries.allOrders()
+      
+      // 🔄 IMPORTANT: Invalidate user orders to refresh My Orders tab
+      if (variables.renterId) {
+        invalidateQueries.userOrders(variables.renterId)
+      }
     },
     onError: (error, variables) => {
       // Revert optimistic update on error
@@ -222,6 +256,21 @@ export function useCreateOrderDetails(
     onError: (error, variables) => {
       console.error('Failed to create order details:', error)
     },
+    ...options,
+  })
+}
+
+// Calculate Final Amount Query (for pickup)
+export function useCalculateFinalAmount(
+  orderId: string,
+  options?: Omit<UseQueryOptions, 'queryKey' | 'queryFn'>
+) {
+  return useQuery({
+    queryKey: queryKeys.orderFinalAmount(orderId),
+    queryFn: () => orderAPI.calculateFinalAmount(orderId),
+    enabled: !!orderId,
+    // Refetch every 30 seconds when screen is focused to get updated amount
+    refetchInterval: 30000,
     ...options,
   })
 }

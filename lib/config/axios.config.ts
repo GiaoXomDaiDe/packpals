@@ -9,6 +9,8 @@ const apiClient: AxiosInstance = axios.create({
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        // Add ngrok header to skip browser warning for ngrok free plan
+        'ngrok-skip-browser-warning': 'true',
     },
 })
 

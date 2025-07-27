@@ -30,7 +30,6 @@ export interface SuccessResponseWithPagination<T> {
     code: string
 }
 
-// SignalR Notification Types
 export interface SignalRNotification {
     id: string
     type: 'NEW_ORDER' | 'ORDER_STATUS_CHANGE' | 'PENDING_COUNT_UPDATE'
@@ -73,7 +72,6 @@ export interface SignalRConnectionState {
     reconnectAttempts: number
 }
 
-// Storage Domain Types
 export interface Storage {
     id: string
     status: 'AVAILABLE' | 'OCCUPIED' | 'MAINTENANCE'
@@ -88,10 +86,9 @@ export interface Storage {
     rating?: number
     totalOrders?: number
     keeperPhoneNumber?: string
-    pendingOrdersCount?: number // New field for keeper notification badges
+    pendingOrdersCount?: number
 }
 
-// Storage API Response Types (matching backend exactly)
 export interface StorageApiData {
     id: string
     status: 'AVAILABLE' | 'UNAVAILABLE' | 'MAINTENANCE'
@@ -104,7 +101,7 @@ export interface StorageApiData {
     keeperPhoneNumber: string
     averageRating: number
     ratingCount: number
-    pendingOrdersCount?: number // New field for keeper notification badges
+    pendingOrdersCount?: number
 }
 
 export interface StorageListResponse {
@@ -142,8 +139,6 @@ export interface User {
     phoneNumber: string
     role: 'RENTER' | 'KEEPER'
 }
-
-// Enhanced Order types for API responses
 export interface OrderApiData {
     id: string
     renterId: string
@@ -183,7 +178,6 @@ export interface OrderDetailApiData {
     size?: SizeApiData
 }
 
-// Orders list API response
 export interface OrdersListResponse {
     pageIndex: number
     totalPages: number
@@ -193,13 +187,25 @@ export interface OrdersListResponse {
     hasNext: boolean
     data: OrderApiData[]
 }
-
-// Updated Order API responses
 export type OrdersSuccessResponse = SuccessResponseWithPagination<OrderApiData>
 export type OrderSuccessResponse = SuccessResponse<OrderApiData>
 export type StorageOrdersApiResponse = SuccessResponse<OrderApiData[]>
+export type KeeperOrdersApiResponse = SuccessResponse<{
+    pageIndex: number
+    totalPages: number
+    pageSize: number
+    totalCount: number
+    hasPrevious: boolean
+    hasNext: boolean
+    data: ViewSummaryOrderModel[]
+}>
 
-// Legacy Order interface (for backward compatibility)
+// Order pricing calculation response
+export interface OrderFinalAmountData {
+    finalAmount: number
+}
+export type OrderFinalAmountResponse = SuccessResponse<OrderFinalAmountData>
+
 export interface Order {
     id: string
     renterId: string
@@ -213,6 +219,23 @@ export interface Order {
     renter?: User
     storage?: Storage
     orderDetails?: OrderDetail[]
+}
+
+export interface ViewSummaryOrderModel {
+    id: string
+    renterId: string
+    storageId: string
+    status: string
+    totalAmount: number
+    packageDescription: string
+    orderDate: string
+    isPaid: boolean
+    renter?: {
+        id: string
+        username: string
+        name: string
+        email: string
+    }
 }
 
 export interface OrderDetail {

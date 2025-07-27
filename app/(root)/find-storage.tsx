@@ -1,10 +1,12 @@
 import EnhancedMap from '@/components/EnhancedMap'
+import { StorageDisplayCard } from '@/components/StorageDisplayCard'
 import { useStorageDistance } from '@/lib/hooks/useStorageDistance'
-import { useStorageList } from '@/lib/query/hooks'
+import { AvailableStatus, useStorageList } from '@/lib/query/hooks'
 import { StorageApiData, StorageMarkerData } from '@/lib/types/type'
 import { filterStoragesByRadius } from '@/lib/utils/distance'
 import { useLocationStore, useStorageStore } from '@/store'
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet'
+import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
 import React, { useEffect, useRef, useState } from 'react'
 import {
@@ -38,7 +40,6 @@ const FindStorage = () => {
         (StorageMarkerData & { distance: number })[]>([])
     const [cachedStorages, setCachedStorages] = useState<
         (StorageMarkerData & { distance: number })[]>([])
-    const [routeInfo, setRouteInfo] = useState<{ distance: string } | null>(null)
     const [routeError, setRouteError] = useState<string | null>(null)
     const { userLatitude, userLongitude, userAddress } = useLocationStore()
     const { setSelectedStorage: setStoreSelectedStorage, setStorages } =
@@ -60,7 +61,7 @@ const FindStorage = () => {
         refetch,
         error,
     } = useStorageList({
-        status: 'AVAILABLE',
+        status: AvailableStatus.AVAILABLE,
         limit: 100,
     })
     console.log(storagesResponse?.data.data, 'Storage List Response')
@@ -98,8 +99,8 @@ const FindStorage = () => {
                     status: storage.status || 'AVAILABLE',
                     keeperPhoneNumber: storage.keeperPhoneNumber || 'N/A',
                     keeperId: storage.keeperId || 'unknown',
-                    pricePerDay: 50000,
-                    rating: storage.averageRating || 4.5,
+                    pricePerDay: 0, // Price will be calculated during booking
+                    rating: storage.averageRating || 0,
                     keeperName: storage.keeperName || 'Storage Owner',
                     images: [
                         'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400',
@@ -173,48 +174,62 @@ const FindStorage = () => {
 
     // Update route info when distance result changes
     useEffect(() => {
+        console.log('🔄 Distance result changed:', {
+            distanceResult,
+            isDistanceLoading,
+        })
+        
         if (distanceResult) {
             if (distanceResult.error) {
+                console.log('❌ Distance calculation error:', distanceResult.error)
                 setRouteError(distanceResult.error)
-                setRouteInfo(null)
             } else if (distanceResult.distance) {
-                setRouteInfo({
-                    distance: `${distanceResult.distance.toFixed(1)} km`,
-                })
+                // ✅ Distance calculated successfully  
+                console.log('✅ Distance calculated:', distanceResult.distance.toFixed(1), 'km')
                 setRouteError(null)
             }
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [distanceResult])
 
-    // Handle route errors
-    const handleRouteError = (error: string) => {
-        setRouteError(error)
-        setRouteInfo(null)
-        console.error('Route error:', error)
-    }
-
-    // Handle storage marker/card press (unified interaction)
+    // Handle storage marker/card press (unified interaction) - Option 3: Immediate feedback
     const handleStoragePress = (
         storage: StorageMarkerData & { distance?: number }
     ) => {
+        // ✅ IMMEDIATE HAPTIC FEEDBACK for better user experience
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        
         if (typeof storage.distance === 'number') {
             setSelectedStorage(
                 storage as StorageMarkerData & { distance: number }
             )
         }
-        // Reset route info when selecting new storage
-        setRouteInfo(null)
+        
+        // ✅ IMMEDIATE FEEDBACK: Clear any previous errors
         setRouteError(null)
         
+        // ✅ IMMEDIATE MAP ANIMATION: Fit coordinates without waiting for route calculation
         if (mapRef.current && userLatitude && userLongitude) {
             const coordinates = [
                 { latitude: userLatitude, longitude: userLongitude },
                 { latitude: storage.latitude, longitude: storage.longitude },
             ]
+            
+            // Animate map immediately for instant visual feedback
             mapRef.current.fitToCoordinates(coordinates, {
                 edgePadding: { top: 50, right: 50, bottom: 300, left: 50 },
                 animated: true,
             })
+            
+            // Also zoom to the selected storage for better focus
+            setTimeout(() => {
+                mapRef.current?.animateToRegion({
+                    latitude: storage.latitude,
+                    longitude: storage.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                }, 1000)
+            }, 500) // Small delay to let fitToCoordinates finish first
         }
     }
 
@@ -481,12 +496,16 @@ const FindStorage = () => {
                                             key={suggestion.id}
                                             onPress={() => {
                                                 console.log('Selected suggestion:', suggestion)
+                                                // ✅ HAPTIC FEEDBACK for selection
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                                                
+                                                // ✅ IMMEDIATE FEEDBACK: Set selected storage and clear errors
                                                 setSelectedStorage(suggestion)
+                                                setRouteError(null)
                                                 setSearchQuery('')
                                                 setSearchSuggestions([])
-                                                handleStoragePress(suggestion)
                                                 
-                                                // Focus on the selected storage on map
+                                                // ✅ IMMEDIATE MAP FOCUS: Animate to storage location right away
                                                 if (mapRef.current) {
                                                     mapRef.current.animateToRegion({
                                                         latitude: suggestion.latitude,
@@ -495,6 +514,9 @@ const FindStorage = () => {
                                                         longitudeDelta: 0.005,
                                                     }, 1000)
                                                 }
+                                                
+                                                // Call handleStoragePress for full functionality
+                                                handleStoragePress(suggestion)
                                             }}
                                             className="px-4 py-3 border-b border-gray-100 last:border-b-0"
                                             activeOpacity={0.7}
@@ -586,9 +608,10 @@ const FindStorage = () => {
                                         />
                                     </TouchableOpacity>
                                 </View>
-                                {/* Selected Storage Detail Card */}
-                                <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-                                    <View className="flex-row items-start">
+                                {/* Selected Storage Detail Card - Enhanced Layout */}
+                                <View className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4">
+                                    {/* Header Image with Gradient Overlay */}
+                                    <View className="relative">
                                         <Image
                                             source={{
                                                 uri:
@@ -596,79 +619,109 @@ const FindStorage = () => {
                                                         ?.images?.[0] ||
                                                     'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400',
                                             }}
-                                            className="w-20 h-20 rounded-xl mr-4"
+                                            className="w-full h-32"
                                             resizeMode="cover"
                                         />
-                                        <View className="flex-1">
-                                            <Text className="text-lg font-JakartaBold text-gray-900 mb-1">
-                                                {selectedStorage?.title ||
-                                                    'Storage Space'}
+                                        {/* Gradient Overlay */}
+                                        <View 
+                                            className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"
+                                            style={{
+                                                backgroundColor: 'transparent',
+                                                backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.4), transparent)'
+                                            }}
+                                        />
+                                        {/* Status Badge */}
+                                        <View className="absolute top-3 right-3 bg-green-500 rounded-full px-3 py-1">
+                                            <Text className="text-white font-JakartaBold text-xs">
+                                                Available
                                             </Text>
-                                            <View className="flex-row items-center mb-2">
-                                                <Ionicons
-                                                    name="location-outline"
-                                                    size={14}
-                                                    color="#6b7280"
-                                                />
-                                                <Text
-                                                    className="text-gray-600 ml-1 text-sm flex-1"
-                                                    numberOfLines={2}
-                                                >
-                                                    {selectedStorage?.address ||
-                                                        'Unknown Location'}
+                                        </View>
+                                    </View>
+
+                                    {/* Content Section */}
+                                    <View className="p-4">
+                                        {/* Title and Distance */}
+                                        <View className="flex-row items-start justify-between mb-3">
+                                            <View className="flex-1">
+                                                <Text className="text-xl font-JakartaBold text-gray-900 mb-1">
+                                                    {selectedStorage?.title || 'Storage Space'}
                                                 </Text>
-                                            </View>
-                                            <View className="flex-row items-center justify-between">
                                                 <View className="flex-row items-center">
-                                                    <Ionicons
-                                                        name="star"
-                                                        size={14}
-                                                        color="#fbbf24"
-                                                    />
-                                                    <Text className="text-gray-600 ml-1 text-sm">
-                                                        {selectedStorage?.rating?.toFixed(
-                                                            1
-                                                        ) || '4.5'}
+                                                    <View className="bg-blue-100 rounded-full p-1 mr-2">
+                                                        <Ionicons
+                                                            name="location"
+                                                            size={12}
+                                                            color="#007AFF"
+                                                        />
+                                                    </View>
+                                                    <Text className="text-blue-600 font-JakartaMedium text-sm">
+                                                        {selectedStorage?.distance?.toFixed(1) || '0.0'} km away
                                                     </Text>
                                                 </View>
-                                                <Text className="text-blue-600 font-JakartaBold text-sm">
-                                                    {selectedStorage?.pricePerDay?.toLocaleString() ||
-                                                        '50,000'}{' '}
-                                                    VND/day
-                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Address */}
+                                        <View className="flex-row items-start mb-4">
+                                            <Ionicons
+                                                name="location-outline"
+                                                size={16}
+                                                color="#6b7280"
+                                                style={{ marginTop: 2 }}
+                                            />
+                                            <Text
+                                                className="text-gray-600 ml-2 text-sm flex-1 leading-5"
+                                                numberOfLines={2}
+                                            >
+                                                {selectedStorage?.address || 'Unknown Location'}
+                                            </Text>
+                                        </View>
+
+                                        {/* Rating and Info Row */}
+                                        <View className="flex-row items-center justify-between pt-3 border-t border-gray-100">
+                                            {/* Rating */}
+                                            <View className="flex-row items-center">
+                                                <View className="bg-yellow-100 rounded-lg p-2 mr-3">
+                                                    <Ionicons
+                                                        name="star"
+                                                        size={16}
+                                                        color="#fbbf24"
+                                                    />
+                                                </View>
+                                                <View>
+                                                    <Text className="text-gray-500 text-xs font-JakartaMedium">
+                                                        Rating
+                                                    </Text>
+                                                    <Text className="text-gray-900 font-JakartaBold text-xs">
+                                                        {selectedStorage?.rating 
+                                                            ? `${selectedStorage.rating.toFixed(1)}/5.0` 
+                                                            : 'No ratings yet'
+                                                        }
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* Keeper Info */}
+                                            <View className="flex-row items-center">
+                                                <View className="bg-gray-100 rounded-lg p-2 mr-3">
+                                                    <Ionicons
+                                                        name="person"
+                                                        size={16}
+                                                        color="#6b7280"
+                                                    />
+                                                </View>
+                                                <View>
+                                                    <Text className="text-gray-500 text-xs font-JakartaMedium">
+                                                        Keeper
+                                                    </Text>
+                                                    <Text className="text-gray-900 font-JakartaBold text-xs" numberOfLines={1}>
+                                                        {selectedStorage?.keeperName || 'Storage Owner'}
+                                                    </Text>
+                                                </View>
                                             </View>
                                         </View>
                                     </View>
                                 </View>
-
-
-                                {/* Distance Information */}
-                                {(routeInfo || isDistanceLoading) && (
-                                    <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-                                        <Text className="text-gray-900 font-JakartaBold text-lg mb-3">
-                                            Distance Information
-                                        </Text>
-                                        <View className="items-center">
-                                            <View className="bg-blue-100 rounded-lg p-3 mb-3">
-                                                <Ionicons name="car" size={24} color="#007AFF" />
-                                            </View>
-                                            {isDistanceLoading ? (
-                                                <Text className="text-gray-500 font-JakartaMedium text-sm">
-                                                    Calculating distance...
-                                                </Text>
-                                            ) : (
-                                                <>
-                                                    <Text className="text-gray-600 text-sm font-JakartaMedium mb-1">
-                                                        Driving Distance
-                                                    </Text>
-                                                    <Text className="text-blue-600 font-JakartaBold text-xl">
-                                                        {routeInfo?.distance || 'N/A'}
-                                                    </Text>
-                                                </>
-                                            )}
-                                        </View>
-                                    </View>
-                                )}
 
                                 {/* Route Error */}
                                 {routeError && (
@@ -725,128 +778,36 @@ const FindStorage = () => {
                                         {filteredStorages.map(
                                             (storage, index) => {
                                                 return (
-                                                    <TouchableOpacity
+                                                    <StorageDisplayCard
                                                         key={storage.id}
-                                                        onPress={() =>
-                                                            handleStoragePress(
-                                                                storage
-                                                            )
-                                                        }
-                                                        className="bg-white rounded-2xl mb-3 overflow-hidden"
-                                                        activeOpacity={0.95}
-                                                        style={{
-                                                            width: '48%',
-                                                            shadowColor: '#000',
-                                                            shadowOffset: {
-                                                                width: 0,
-                                                                height: 4,
-                                                            },
-                                                            shadowOpacity: 0.08,
-                                                            shadowRadius: 12,
-                                                            elevation: 6,
-                                                            transform: [
-                                                                { scale: 1 },
-                                                            ],
+                                                        storage={{
+                                                            ...storage,
+                                                            title: storage.title,
+                                                            description: storage.description,
                                                         }}
-                                                    >
-                                                        {/* Image with Overlay */}
-                                                        <View className="relative">
-                                                            <Image
-                                                                source={{
-                                                                    uri: storage
-                                                                        .images[0],
-                                                                }}
-                                                                className="w-full h-28"
-                                                                resizeMode="cover"
-                                                            />
-                                                            {/* Subtle Dark Overlay */}
-                                                            <View
-                                                                className="absolute inset-0"
-                                                                style={{
-                                                                    backgroundColor:
-                                                                        'rgba(0, 0, 0, 0.1)',
-                                                                }}
-                                                            />
-
-                                                            {/* Price Badge */}
-                                                            <View className="absolute top-2 right-2 bg-white/95 rounded-lg px-2 py-1">
-                                                                <Text className="text-blue-600 font-JakartaBold text-xs">
-                                                                    {(
-                                                                        storage.pricePerDay /
-                                                                        1000
-                                                                    ).toFixed(
-                                                                        0
-                                                                    )}
-                                                                    k/day
-                                                                </Text>
-                                                            </View>
-
-                                                            {/* Distance Badge */}
-                                                            <View className="absolute bottom-2 left-2 bg-black/60 rounded-lg px-2 py-0.5">
-                                                                <Text className="text-white text-xs font-JakartaMedium">
-                                                                    {storage.distance.toFixed(
-                                                                        1
-                                                                    )}{' '}
-                                                                    km
-                                                                </Text>
-                                                            </View>
-                                                        </View>
-
-                                                        {/* Content Section */}
-                                                        <View className="p-3">
-                                                            {/* Title */}
-                                                            <Text
-                                                                className="text-sm font-JakartaBold text-gray-900 mb-1"
-                                                                numberOfLines={
-                                                                    1
-                                                                }
-                                                            >
-                                                                {storage.title}
-                                                            </Text>
-
-                                                            {/* Address */}
-                                                            <View className="flex-row items-center mb-2">
-                                                                <Ionicons
-                                                                    name="location-outline"
-                                                                    size={12}
-                                                                    color="#9ca3af"
-                                                                />
-                                                                <Text
-                                                                    className="text-gray-500 ml-1 text-xs flex-1"
-                                                                    numberOfLines={
-                                                                        1
-                                                                    }
-                                                                >
-                                                                    {
-                                                                        storage.address
-                                                                    }
-                                                                </Text>
-                                                            </View>
-
-                                                            {/* Bottom Row: Rating and Status */}
-                                                            <View className="flex-row items-center justify-between">
-                                                                <View className="flex-row items-center">
-                                                                    <Ionicons
-                                                                        name="star"
-                                                                        size={
-                                                                            12
-                                                                        }
-                                                                        color="#fbbf24"
-                                                                    />
-                                                                    <Text className="text-gray-600 ml-1 text-xs font-JakartaMedium">
-                                                                        {storage.rating.toFixed(
-                                                                            1
-                                                                        )}
-                                                                    </Text>
-                                                                </View>
-                                                                <View className="bg-green-100 rounded-full px-2 py-0.5">
-                                                                    <Text className="text-green-700 text-xs font-JakartaMedium">
-                                                                        Available
-                                                                    </Text>
-                                                                </View>
-                                                            </View>
-                                                        </View>
-                                                    </TouchableOpacity>
+                                                        onPress={(storageData) => {
+                                                            // Convert StorageData back to StorageMarkerData for handleStoragePress
+                                                            const markerData: StorageMarkerData & { distance: number } = {
+                                                                id: storageData.id,
+                                                                title: storageData.title || 'Storage Space',
+                                                                address: storageData.address,
+                                                                latitude: storageData.latitude || 0,
+                                                                longitude: storageData.longitude || 0,
+                                                                status: storageData.status || 'AVAILABLE',
+                                                                keeperPhoneNumber: storageData.keeperPhoneNumber || 'N/A',
+                                                                keeperId: storageData.keeperId || 'unknown',
+                                                                pricePerDay: storageData.pricePerDay || 0,
+                                                                rating: storageData.rating || 0,
+                                                                keeperName: storageData.keeperName || 'Storage Owner',
+                                                                images: storageData.images || ['https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400'],
+                                                                description: storageData.description || 'Secure storage space available for rent',
+                                                                distance: storageData.distance || 0,
+                                                            };
+                                                            handleStoragePress(markerData);
+                                                        }}
+                                                        variant="grid"
+                                                        width="48%"
+                                                    />
                                                 )
                                             }
                                         )}

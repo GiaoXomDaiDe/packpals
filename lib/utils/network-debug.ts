@@ -8,11 +8,11 @@ import { Platform } from 'react-native'
 // Test multiple URLs to find working one
 export const testMultipleURLs = async () => {
     const urls = [
-        'http://192.168.43.112:5000/api',      // Android emulator
+        'http://192.168.1.43:5000/api',      // Android emulator
         'http://localhost:5000/api',      // iOS simulator  
         'http://127.0.0.1:5000/api',     // Alternative localhost
         'http://192.168.1.100:5000/api', // Replace with your actual IP
-        'http://192.168.43.112:5000',          // Without /api
+        'http://192.168.1.43:5000',          // Without /api
         'http://localhost:5000',          // Without /api
     ]
 
@@ -50,10 +50,10 @@ export const testBackendHealth = async () => {
     
     // Try different health check endpoints
     const healthEndpoints = [
-        'http://192.168.43.112:5000/health',
-        'http://192.168.43.112:5000/api/health',
-        'http://192.168.43.112:5000/',
-        'http://192.168.43.112:5000/api',
+        'http://192.168.1.43:5000/health',
+        'http://192.168.1.43:5000/api/health',
+        'http://192.168.1.43:5000/',
+        'http://192.168.1.43:5000/api',
     ]
     
     for (const endpoint of healthEndpoints) {
@@ -126,7 +126,7 @@ export const runCompleteDiagnostic = async () => {
     console.log('\n💡 Troubleshooting Steps:')
     console.log('1. Verify backend is running: Check your terminal shows "Now listening on: http://localhost:5000"')
     console.log('2. Check Windows Firewall: Allow Node.js/dotnet through firewall')
-    console.log('3. Try your computer\'s IP address instead of 192.168.43.112')
+    console.log('3. Try your computer\'s IP address instead of  192.168.1.43')
     console.log('4. Restart Android emulator if needed')
     console.log('5. Check if antivirus is blocking the connection')
     

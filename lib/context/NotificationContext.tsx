@@ -36,7 +36,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   children,
   userId,
   userType = 'keeper',
-  baseUrl = 'http://192.168.43.112:5000', // Updated to correct IPv4 address for physical device
+  baseUrl = 'http://192.168.1.43:5000', // Updated to correct IPv4 address for physical device
   autoConnect = true,
   showAlerts = true
 }) => {

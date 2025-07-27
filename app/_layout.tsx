@@ -37,7 +37,7 @@ export default function RootLayout() {
     return (
         <QueryProvider>
             <NotificationProvider
-                baseUrl="http://192.168.43.112:5000" // Updated to correct IP and port
+                baseUrl="http://192.168.1.43:5000" // Updated to correct IP and port
                 autoConnect={true}
                 showAlerts={true}
             >

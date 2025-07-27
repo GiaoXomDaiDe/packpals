@@ -9,6 +9,7 @@ export * from './useOrderQueries'
 export * from './useAuthQueries'
 
 // User hooks
+export * from './useUserMutations'
 export * from './useUserQueries'
 
 // Size hooks
@@ -26,5 +27,9 @@ export * from './useUploadQueries'
 // Distance hooks
 export * from './useDistanceQueries'
 
+// Rating hooks
+export * from './useRatingQueries'
+
 // Re-export query client utilities
 export { invalidateQueries, optimisticUpdates, queryClient, queryKeys } from '../client'
+

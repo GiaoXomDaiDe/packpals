@@ -115,8 +115,8 @@ export const PayOSPaymentModal: React.FC<PayOSPaymentModalProps> = ({
         createPaymentMutation.mutate({
             amount,
             description: `PackPals Storage Order`, // Simplified without Vietnamese chars
-            returnUrl: `https://3fea27d64506.ngrok-free.app/payment/success?orderCode=${paymentCode}&orderId=${orderId}`, // Updated ngrok URL
-            cancelUrl: `https://3fea27d64506.ngrok-free.app/payment/cancel?orderCode=${paymentCode}&orderId=${orderId}`,   // Updated ngrok URL
+            returnUrl: `https://a169fb8b36f3.ngrok-free.app/payment/success?orderCode=${paymentCode}&orderId=${orderId}`, // Updated ngrok URL
+            cancelUrl: `https://a169fb8b36f3.ngrok-free.app/payment/cancel?orderCode=${paymentCode}&orderId=${orderId}`,   // Updated ngrok URL
             paymentCode,
             orderId,
             buyerEmail: customerEmail,

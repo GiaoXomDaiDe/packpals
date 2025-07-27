@@ -1,9 +1,9 @@
 import { useUserOrders } from '@/lib/query/hooks'
-import { useUserProfile } from '@/lib/query/hooks/useUserQueries'
-import { OrderApiData, OrdersSuccessResponse, UserProfileData } from '@/lib/types/type'
+import { OrderApiData, OrdersSuccessResponse } from '@/lib/types/type'
 import { useUserStore } from '@/store'
+import { useFocusEffect } from '@react-navigation/native'
 import { router } from 'expo-router'
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from 'react-native-vector-icons/Ionicons'
@@ -14,40 +14,17 @@ const Orders = () => {
     const [currentPage, setCurrentPage] = useState<number>(1)
     const pageSize = 10
     
-    // Get user profile to extract renterId
-    const {
-        data: userProfileResponse,
-        isLoading: userProfileLoading,
-        error: userProfileError
-    } = useUserProfile(user?.id || '', {
-        enabled: !!user?.id,
-        retry: false // Don't retry on 500 errors
-    })
-    
-    // Extract renterId from user profile with proper typing
-    const userData: UserProfileData | undefined = (userProfileResponse as any)?.data.data
-    const renterId = userData?.renter?.renterId
+    // Use userId directly since backend API expects userId, not renterId
+    const userId = user?.id
+    console.log('👤 Using User ID for orders:', userId)
     
     console.log('👤 User from store:', user)
-    console.log('👤 User Profile Loading:', userProfileLoading)
-    console.log('👤 User Profile Error:', userProfileError)
-    console.log('👤 User Profile Response Raw:', userProfileResponse)
-    console.log('👤 User Profile Data:', userData)
-    console.log('🏠 Renter ID:', renterId)
     
-    // Log detailed error information
-    if (userProfileError) {
-        console.error('🚨 User Profile API Error Details:', {
-            message: userProfileError.message,
-            name: userProfileError.name,
-            stack: userProfileError.stack
-        })
-    }
+    // 🔍 CRITICAL DEBUG: Check if userId is correct
+    console.log('🚨 DEBUG - User ID Check:')
+    console.log('   - Current User ID:', userId)
+    console.log('   - Expected User ID with orders: should match the renterId from database orders')
     
-    // Check if it's a database connection error
-    const isDatabaseError = (userProfileResponse as any)?.data?.message?.includes('Login failed for user')
-    
-    console.log('💾 Database Connection Error:', isDatabaseError)
     
     // Build query based on selected filter
     const getQueryParams = () => {
@@ -75,6 +52,13 @@ const Orders = () => {
             case 'PAID':
                 params.IsPaid = true
                 break
+            case 'DEBUG_ALL':
+                // 🔍 DEBUG: Send no filters to get ALL orders regardless of backend logic
+                return {
+                    PageIndex: currentPage,
+                    PageSize: pageSize
+                    // No Status or IsPaid filters
+                }
             // 'ALL' case - no additional filters
         }
         
@@ -88,8 +72,8 @@ const Orders = () => {
         isRefetching: refreshing,
         refetch,
         error
-    } = useUserOrders(renterId || '', getQueryParams(), {
-        enabled: !!renterId
+    } = useUserOrders(userId || '', getQueryParams(), {
+        enabled: !!userId
     })
     
     console.log('📋 Orders Response Full:', ordersResponse)
@@ -126,6 +110,39 @@ const Orders = () => {
     console.log('📋 Final Orders Array:', orders)
     console.log('📋 Orders Array Length:', orders?.length)
     console.log('📊 Pagination Info:', paginationInfo)
+    
+    // 🐛 Debug: Log filter details to understand why orders might be missing
+    console.log('🔍 Debug Info:', {
+        selectedFilter,
+        queryParams: getQueryParams(),
+        hasOrders: !!orders && orders.length > 0,
+        orderStatuses: orders?.map(o => ({ id: o.id?.slice(-8), status: o.status, isPaid: o.isPaid }))
+    })
+    
+    // 🚨 CRITICAL DEBUG: Log API call details
+    console.log('🌐 API Call Debug:')
+    console.log('   - API Endpoint: GET /api/order/user/' + userId)
+    console.log('   - Query Params:', getQueryParams())
+    console.log('   - Expected COMPLETED Order ID: D4BAE145-0073-4B74-8335-55264AEACB2F')
+    console.log('   - Raw API Response:', ordersResponse)
+    console.log('   - Parsed Orders:', orders)
+    
+    // 🔍 Check if our COMPLETED order exists in response
+    const completedOrderInResponse = orders?.find(o => o.id === 'D4BAE145-0073-4B74-8335-55264AEACB2F')
+    console.log('   - Found COMPLETED Order in API response?', !!completedOrderInResponse)
+    if (completedOrderInResponse) {
+        console.log('   - COMPLETED Order Details:', completedOrderInResponse)
+    }
+
+    // 🔄 Auto-refresh when screen comes into focus (e.g., after payment)
+    useFocusEffect(
+        React.useCallback(() => {
+            if (userId) {
+                console.log('📱 Orders tab focused - refreshing data...')
+                refetch()
+            }
+        }, [userId, refetch])
+    )
 
     const onRefresh = () => {
         refetch()
@@ -148,6 +165,8 @@ const Orders = () => {
         { key: 'IN_STORAGE', label: 'In Storage', icon: 'cube-outline' },
         { key: 'PAID', label: 'Paid', icon: 'card-outline' },
         { key: 'COMPLETED', label: 'Completed', icon: 'checkmark-done-outline' },
+        // 🔍 DEBUG: Add a test filter to see all possible values
+        { key: 'DEBUG_ALL', label: 'Debug All', icon: 'bug-outline' },
     ]
 
     const getStatusColor = (status: OrderApiData['status'] | string) => {
@@ -163,17 +182,17 @@ const Orders = () => {
 
     const getStatusText = (status: OrderApiData['status'] | string) => {
         switch (status) {
-            case 'PENDING': return 'Awaiting confirmation'
-            case 'CONFIRMED': return 'Confirmed by keeper'
-            case 'IN_STORAGE': return 'Items in storage'
-            case 'COMPLETED': return 'Service completed'
+            case 'PENDING': return 'Pending'
+            case 'CONFIRMED': return 'Confirmed'
+            case 'IN_STORAGE': return 'In Storage'
+            case 'COMPLETED': return 'Completed'
             case 'CANCELLED': return 'Cancelled'
-            default: return status || 'Unknown'
+            default: return 'Unknown'
         }
     }
 
-    // Show loading if we don't have renterId yet or if orders are loading
-    if (userProfileLoading || (!renterId && !!user?.id) || (loading && !refreshing)) {
+    // Show loading if we don't have userId yet or if orders are loading
+    if (!userId && !!user?.id || (loading && !refreshing)) {
         return (
             <SafeAreaView className="flex-1 bg-gray-50">
                 {/* Header */}
@@ -203,79 +222,13 @@ const Orders = () => {
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color="#3b82f6" />
                     <Text className="text-gray-600 mt-4 font-JakartaMedium">
-                        {userProfileLoading ? 'Loading user profile...' : 
-                         !renterId ? 'Getting renter information...' : 'Loading your orders...'}
+                        {!userId ? 'Getting user information...' : 'Loading your orders...'}
                     </Text>
-                    {userProfileError ? (
-                        <Text className="text-red-500 mt-2 text-sm text-center px-4">
-                            Error: {userProfileError.message || 'Failed to load user profile'}
-                        </Text>
-                    ) : null}
-                    {isDatabaseError ? (
-                        <View className="mt-4 bg-red-50 p-4 rounded-2xl mx-6">
-                            <Text className="text-red-700 font-JakartaBold text-center mb-2">
-                                Database Connection Issue
-                            </Text>
-                            <Text className="text-red-600 text-sm text-center mb-3">
-                                The server cannot connect to the database. This might be a temporary issue.
-                            </Text>
-                            <TouchableOpacity
-                                onPress={() => onRefresh()}
-                                className="bg-red-500 rounded-lg px-4 py-2 self-center"
-                            >
-                                <Text className="text-white font-JakartaMedium text-sm">
-                                    Retry Connection
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    ) : null}
                 </View>
             </SafeAreaView>
         )
     }
 
-    // Check if user has a renter profile  
-    if (user?.id && !userProfileLoading && userProfileResponse && !renterId) {
-        return (
-            <SafeAreaView className="flex-1 bg-gray-50">
-                {/* Header */}
-                <View className="bg-white px-6 py-4 shadow-sm">
-                    <View className="flex-row items-center justify-between mb-4">
-                        <Text className="text-2xl font-JakartaBold text-gray-900">
-                            My Orders
-                        </Text>
-                        <TouchableOpacity
-                            onPress={() => router.push('/(root)/find-storage')}
-                            className="bg-blue-500 rounded-full p-2"
-                        >
-                            <Ionicons name="add" size={20} color="white" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-                
-                <View className="flex-1 items-center justify-center px-6">
-                    <Ionicons name="person-outline" size={80} color="#d1d5db" />
-                    <Text className="text-gray-500 text-xl font-JakartaBold mt-4 text-center">
-                        Renter Profile Not Found
-                    </Text>
-                    <Text className="text-gray-400 text-center mt-2">
-                        Your account is not set up as a renter. Please contact support or try logging out and back in.
-                    </Text>
-                    <Text className="text-red-500 text-sm mt-2 text-center">
-                        Debug: User Role - {userData?.role || 'Unknown'} | Has Renter: {userData?.renter ? 'Yes' : 'No'}
-                    </Text>
-                    <TouchableOpacity
-                        onPress={() => router.push('/(root)/find-storage')}
-                        className="mt-6 bg-blue-500 rounded-2xl px-6 py-3"
-                    >
-                        <Text className="text-white font-JakartaBold">
-                            Find Storage
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
-        )
-    }
 
     return (
         <SafeAreaView className="flex-1 bg-gray-50">
@@ -334,108 +287,93 @@ const Orders = () => {
             {/* Orders List */}
             <ScrollView className="flex-1 px-4">
                 {orders && Array.isArray(orders) ? orders.map((item: OrderApiData) => (
-                    <View key={item.id} className="mt-3">
-                        <TouchableOpacity
-                            onPress={() => router.push({
-                                            pathname: '/(root)/orderdetails/[id]',
-                                            params: { id: item.id.toString() }
-                                        })}
-                            className="bg-white rounded-2xl overflow-hidden border border-gray-100"
-                            style={{
-                                shadowColor: '#000',
-                                shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: 0.05,
-                                shadowRadius: 8,
-                                elevation: 3,
-                            }}
-                        >
-                            {/* Compact Header */}
-                            <View className="p-4">
-                                <View className="flex-row items-center justify-between mb-3">
-                                    <View className="flex-row items-center flex-1">
-                                        <View className="bg-blue-500 rounded-xl p-2 mr-3">
-                                            <Ionicons name="receipt" size={16} color="white" />
-                                        </View>
-                                        <View className="flex-1">
-                                            <Text className="text-base font-JakartaBold text-gray-900">
-                                                Order #{item.id ? item.id.toString().slice(-8) : 'N/A'}
-                                            </Text>
-                                            <Text className="text-xs text-gray-500 font-JakartaMedium">
-                                                {(() => {
-                                                    const dateStr = item.orderDate || item.createdAt
-                                                    if (!dateStr) return 'Date not available'
-                                                    const date = new Date(dateStr)
-                                                    return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleDateString('en-US', { 
-                                                        month: 'short', 
-                                                        day: 'numeric', 
-                                                        year: 'numeric' 
-                                                    })
-                                                })()}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <View 
-                                        className="px-3 py-1.5 rounded-lg"
-                                        style={{ backgroundColor: getStatusColor(item.status || '') + '20' }}
-                                    >
-                                        <Text 
-                                            className="text-xs font-JakartaBold"
-                                            style={{ color: getStatusColor(item.status || '') }}
-                                            numberOfLines={1}
-                                        >
-                                            {getStatusText(item.status || '')}
-                                        </Text>
-                                    </View>
+                    <TouchableOpacity
+                        key={item.id}
+                        onPress={() => router.push({
+                            pathname: '/(root)/orderdetails/[id]',
+                            params: { id: item.id.toString() }
+                        })}
+                        className="bg-white rounded-xl p-4 mb-3 border border-gray-100"
+                        style={{
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 4,
+                            elevation: 2,
+                        }}
+                    >
+                        {/* Header Row */}
+                        <View className="flex-row items-center justify-between mb-3">
+                            <View className="flex-row items-center flex-1">
+                                <View className="bg-blue-500 rounded-lg p-2 mr-3">
+                                    <Ionicons name="receipt-outline" size={18} color="white" />
                                 </View>
-                                
-                                {/* Package Description */}
-                                <View className="bg-gray-50 rounded-xl p-3 mb-3">
-                                    <View className="flex-row items-center">
-                                        <Ionicons name="cube-outline" size={16} color="#6b7280" />
-                                        <Text className="text-gray-700 text-sm font-JakartaMedium flex-1 ml-2" numberOfLines={2}>
-                                            {item.packageDescription || 'No description available'}
-                                        </Text>
-                                    </View>
-                                </View>
-                                
-                                {/* Compact Info Row */}
-                                <View className="flex-row justify-between items-center">
-                                    {/* Amount */}
-                                    <View className="flex-1 mr-3">
-                                        <Text className="text-xs text-gray-500 font-JakartaMedium">Total Amount</Text>
-                                        <Text className="text-base font-JakartaBold text-blue-600">
-                                            {(item.totalAmount && !isNaN(Number(item.totalAmount))) 
-                                                ? Number(item.totalAmount).toLocaleString() + ' VND'
-                                                : '0 VND'}
-                                        </Text>
-                                    </View>
-                                    
-                                    {/* Payment Status */}
-                                    <View className="items-center mr-3">
-                                        <Text className="text-xs text-gray-500 font-JakartaMedium mb-1">Payment</Text>
-                                        <View className={`px-2 py-1 rounded-md ${item.isPaid ? 'bg-green-100' : 'bg-orange-100'}`}>
-                                            <Text className={`text-xs font-JakartaBold ${item.isPaid ? 'text-green-700' : 'text-orange-700'}`}>
-                                                {item.isPaid ? 'Paid' : 'Unpaid'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    
-                                    {/* Action Button */}
-                                    <TouchableOpacity
-                                        className="bg-blue-500 rounded-xl px-4 py-2"
-                                        onPress={() => router.push({
-                                            pathname: '/(root)/orderdetails/[id]',
-                                            params: { id: item.id.toString() }
-                                        })}
-                                    >
-                                        <Text className="text-white text-xs font-JakartaBold">
-                                            Details
-                                        </Text>
-                                    </TouchableOpacity>
+                                <View className="flex-1">
+                                    <Text className="text-base font-JakartaBold text-gray-900" numberOfLines={1}>
+                                        #{item.id ? item.id.toString().slice(-8) : 'N/A'}
+                                    </Text>
+                                    <Text className="text-xs text-gray-500 font-Jakarta">
+                                        {(() => {
+                                            const dateStr = item.orderDate || item.createdAt
+                                            if (!dateStr) return 'No date'
+                                            const date = new Date(dateStr)
+                                            return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleDateString('en-US', { 
+                                                month: 'short', 
+                                                day: 'numeric'
+                                            })
+                                        })()}
+                                    </Text>
                                 </View>
                             </View>
-                        </TouchableOpacity>
-                    </View>
+                            
+                            {/* Status Badge */}
+                            <View 
+                                className="px-3 py-1 rounded-full"
+                                style={{ backgroundColor: getStatusColor(item.status || '') + '15' }}
+                            >
+                                <Text 
+                                    className="text-xs font-JakartaBold"
+                                    style={{ color: getStatusColor(item.status || '') }}
+                                >
+                                    {getStatusText(item.status || '')}
+                                </Text>
+                            </View>
+                        </View>
+                        
+                        {/* Package Description */}
+                        <View className="bg-gray-50 rounded-lg p-3 mb-3">
+                            <Text className="text-gray-700 text-sm font-Jakarta" numberOfLines={2}>
+                                {item.packageDescription || 'No description'}
+                            </Text>
+                        </View>
+                        
+                        {/* Bottom Row */}
+                        <View className="flex-row justify-between items-center">
+                            {/* Amount */}
+                            <View className="flex-1">
+                                <Text className="text-lg font-JakartaBold text-blue-600">
+                                    {(item.totalAmount && !isNaN(Number(item.totalAmount))) 
+                                        ? Number(item.totalAmount).toLocaleString() + ' ₫'
+                                        : '0 ₫'}
+                                </Text>
+                                <Text className="text-xs text-gray-500 font-Jakarta">
+                                    Total amount
+                                </Text>
+                            </View>
+                            
+                            {/* Payment Status */}
+                            <View className="mr-3">
+                                <View className={`px-2 py-1 rounded-md ${item.isPaid ? 'bg-green-100' : 'bg-orange-100'}`}>
+                                    <Text className={`text-xs font-JakartaBold ${item.isPaid ? 'text-green-700' : 'text-orange-700'}`}>
+                                        {item.isPaid ? 'Paid' : 'Unpaid'}
+                                    </Text>
+                                </View>
+                            </View>
+                            
+                            {/* Arrow Icon */}
+                            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+                        </View>
+                    </TouchableOpacity>
                 )) : null}
                 
                 {/* Pagination */}

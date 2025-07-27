@@ -73,6 +73,29 @@ export const icons = {
     locker
 }
 
+// Sophisticated neutral palette
+export const palette = {
+    background: '#fafafa',
+    surface: '#ffffff',
+    surfaceVariant: '#f8f9fa',
+    primary: '#2563eb',
+    primarySoft: '#dbeafe',
+    secondary: '#64748b',
+    accent: '#06b6d4',
+    accentSoft: '#e0f7fa',
+    success: '#059669',
+    successSoft: '#d1fae5',
+    warning: '#d97706',
+    warningSoft: '#fed7aa',
+    error: '#dc2626',
+    errorSoft: '#fee2e2',
+    text: '#1e293b',
+    textSecondary: '#64748b',
+    textTertiary: '#94a3b8',
+    border: '#e2e8f0',
+    shadow: 'rgba(15, 23, 42, 0.08)'
+}
+
 export const onboarding = [
     {
         id: 1,
