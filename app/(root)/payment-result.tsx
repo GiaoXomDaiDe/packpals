@@ -1,12 +1,11 @@
-import { usePayOSPaymentInfo } from '@/lib/query/hooks'
-import { useMarkOrderAsPaid, useUpdateOrderStatus } from '@/lib/query/hooks/useOrderQueries'
+import { useMarkOrderAsPaid, usePayOSPaymentInfo, useUpdateOrderStatus } from '@/hooks/query'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
-    ActivityIndicator,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from 'react-native-vector-icons/Ionicons'
@@ -146,7 +145,7 @@ export default function PaymentResult() {
                         {paymentInfo && paymentInfo.amount && (
                             <View className="bg-green-50 rounded-xl p-4 w-full mb-6">
                                 <Text className="text-green-700 font-JakartaMedium text-center">
-                                    Amount: {paymentInfo.amount.toLocaleString()} VND ✓
+                                    Amount: {(Math.ceil(paymentInfo.amount / 1000) * 1000).toLocaleString()} VND ✓
                                 </Text>
                                 <Text className="text-green-600 text-center text-sm mt-1">
                                     Order Code: {orderCode}

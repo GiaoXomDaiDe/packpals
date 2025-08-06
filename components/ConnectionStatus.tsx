@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useNotifications } from '../lib/context/NotificationContext';
+import { useNotifications } from '../context/NotificationContext';
 
 export interface ConnectionStatusProps {
   showDetails?: boolean;

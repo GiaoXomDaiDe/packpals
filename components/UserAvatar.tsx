@@ -6,13 +6,17 @@ interface UserAvatarProps {
   size?: number;
   backgroundColor?: string;
   textColor?: string;
+  showOnlineStatus?: boolean;
+  onlineStatusColor?: string;
 }
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({ 
   username = 'User', 
   size = 48, 
   backgroundColor = '#2563eb',
-  textColor = '#ffffff'
+  textColor = '#ffffff',
+  showOnlineStatus = true,
+  onlineStatusColor = '#10b981'
 }) => {
   // Get initials from username
   const getInitials = (name: string): string => {
@@ -39,29 +43,56 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   const initials = getInitials(username);
   const avatarColor = generateColor(username);
   const fontSize = size * 0.4; // Dynamic font size based on avatar size
+  
+  // Calculate online indicator size and position
+  const indicatorSize = Math.max(size * 0.25, 8); // Minimum 8px, scales with avatar
+  const indicatorPosition = size * 0.08; // Distance from edge
 
   return (
-    <View style={{
-      width: size,
-      height: size,
-      borderRadius: size / 2,
-      backgroundColor: avatarColor,
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: 'rgba(0, 0, 0, 0.1)',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    }}>
-      <Text style={{
-        color: textColor,
-        fontSize: fontSize,
-        fontWeight: '700',
-        textAlign: 'center',
+    <View style={{ position: 'relative' }}>
+      {/* Avatar Container */}
+      <View style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: avatarColor,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: 'rgba(0, 0, 0, 0.1)',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
       }}>
-        {initials}
-      </Text>
+        <Text style={{
+          color: textColor,
+          fontSize: fontSize,
+          fontWeight: '700',
+          textAlign: 'center',
+        }}>
+          {initials}
+        </Text>
+      </View>
+      
+      {/* Online Status Indicator */}
+      {showOnlineStatus ? (
+        <View style={{
+          position: 'absolute',
+          bottom: indicatorPosition,
+          right: indicatorPosition,
+          width: indicatorSize,
+          height: indicatorSize,
+          borderRadius: indicatorSize / 2,
+          backgroundColor: onlineStatusColor,
+          borderWidth: 2,
+          borderColor: '#ffffff',
+          shadowColor: 'rgba(0, 0, 0, 0.2)',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.2,
+          shadowRadius: 2,
+          elevation: 4,
+        }} />
+      ) : null}
     </View>
   );
 };

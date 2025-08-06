@@ -1,7 +1,14 @@
-import { useCalculateFinalAmount } from '@/lib/query/hooks/useOrderQueries';
+import { useCalculateFinalAmount } from '@/hooks/query';
 import React from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import CustomButton from './CustomButton';
+
+// Helper function for currency formatting
+const formatCurrency = (amount: number) => {
+    // Round up to nearest 1000 VND for cleaner display
+    const roundedAmount = Math.ceil(amount / 1000) * 1000;
+    return roundedAmount.toLocaleString();
+};
 
 interface OrderPricingCardProps {
   orderId: string;
@@ -29,8 +36,9 @@ const OrderPricingCard: React.FC<OrderPricingCardProps> = ({
   });
 
   const handlePaymentPress = () => {
-    if (pricingResponse?.data?.finalAmount && onProceedPayment) {
-      onProceedPayment(pricingResponse.data.finalAmount);
+    const finalAmount = (pricingResponse as any)?.data?.finalAmount;
+    if (finalAmount && onProceedPayment) {
+      onProceedPayment(finalAmount);
     }
   };
 
@@ -40,7 +48,15 @@ const OrderPricingCard: React.FC<OrderPricingCardProps> = ({
 
   if (isLoading) {
     return (
-      <View className={`bg-white rounded-lg p-4 shadow-md ${className}`}>
+      <View 
+        className={`bg-white rounded-lg p-4 ${className}`}
+        style={{
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 4,
+        }}
+      >
         <View className="flex-row items-center justify-center">
           <ActivityIndicator size="small" color="#0066CC" />
           <Text className="ml-2 text-gray-600">Calculating pricing...</Text>
@@ -66,7 +82,7 @@ const OrderPricingCard: React.FC<OrderPricingCardProps> = ({
     );
   }
 
-  if (!pricingResponse?.data?.finalAmount) {
+  if (!(pricingResponse as any)?.data?.finalAmount) {
     return (
       <View className={`bg-gray-50 rounded-lg p-4 border border-gray-200 ${className}`}>
         <Text className="text-gray-600 text-center">No pricing data available</Text>
@@ -74,12 +90,20 @@ const OrderPricingCard: React.FC<OrderPricingCardProps> = ({
     );
   }
 
-  const finalAmount = pricingResponse.data.finalAmount;
+  const finalAmount = (pricingResponse as any).data.finalAmount;
   const overtimeFees = baseAmount ? Math.max(0, finalAmount - baseAmount) : 0;
   const hasOvertimeFees = overtimeFees > 0;
 
   return (
-    <View className={`bg-white rounded-lg p-4 shadow-md border border-gray-100 ${className}`}>
+    <View 
+      className={`bg-white rounded-lg p-4 border border-gray-100 ${className}`}
+      style={{
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 4,
+      }}
+    >
       {/* Header */}
       <View className="flex-row items-center justify-between mb-4">
         <Text className="text-lg font-semibold text-gray-800">Order Pricing</Text>
@@ -91,24 +115,26 @@ const OrderPricingCard: React.FC<OrderPricingCardProps> = ({
       {/* Pricing Breakdown */}
       <View className="space-y-3 mb-4">
         {/* Base Amount */}
-        {baseAmount && (
+        {baseAmount ? (
           <View className="flex-row justify-between items-center">
             <View>
               <Text className="text-gray-700 font-medium">Base Amount</Text>
-              {estimatedDays && (
+              {estimatedDays ? (
                 <Text className="text-gray-500 text-sm">
                   {estimatedDays} estimated days
                 </Text>
-              )}
+              ) : null}
             </View>
             <Text className="text-gray-800 font-semibold">
-              {baseAmount.toLocaleString('vi-VN')} VND
+                          <Text className="text-blue-900 text-lg font-JakartaBold">
+              {formatCurrency(baseAmount)} VND
+            </Text>
             </Text>
           </View>
-        )}
+        ) : null}
 
         {/* Overtime Fees */}
-        {hasOvertimeFees && (
+        {hasOvertimeFees ? (
           <View className="flex-row justify-between items-center">
             <View>
               <Text className="text-orange-600 font-medium">Overtime Fees</Text>
@@ -117,13 +143,13 @@ const OrderPricingCard: React.FC<OrderPricingCardProps> = ({
               </Text>
             </View>
             <Text className="text-orange-600 font-semibold">
-              +{overtimeFees.toLocaleString('vi-VN')} VND
+              +{formatCurrency(overtimeFees)} VND
             </Text>
           </View>
-        )}
+        ) : null}
 
         {/* Divider */}
-        {baseAmount && <View className="border-t border-gray-200 my-2" />}
+        {baseAmount ? <View className="border-t border-gray-200 my-2" /> : null}
 
         {/* Final Amount */}
         <View className="flex-row justify-between items-center">
@@ -131,20 +157,20 @@ const OrderPricingCard: React.FC<OrderPricingCardProps> = ({
             {baseAmount ? 'Total Amount' : 'Final Amount'}
           </Text>
           <Text className="text-xl font-bold text-blue-600">
-            {finalAmount.toLocaleString('vi-VN')} VND
+            {formatCurrency(finalAmount)} VND
           </Text>
         </View>
       </View>
 
       {/* Payment Button */}
-      {onProceedPayment && (
+      {onProceedPayment ? (
         <CustomButton
-          title={`Pay ${finalAmount.toLocaleString('vi-VN')} VND`}
+          title={`Pay ${formatCurrency(finalAmount)} VND`}
           onPress={handlePaymentPress}
           className="bg-blue-600 mt-2"
           textVariant="primary"
         />
-      )}
+      ) : null}
 
       {/* Info Note */}
       <View className="mt-3 p-3 bg-blue-50 rounded-lg">

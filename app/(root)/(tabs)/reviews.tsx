@@ -1,8 +1,7 @@
 import { router, useFocusEffect } from 'expo-router'
-import React, { useState } from 'react'
+import React from 'react'
 import {
     ActivityIndicator,
-    RefreshControl,
     ScrollView,
     Text,
     TouchableOpacity,
@@ -11,11 +10,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from 'react-native-vector-icons/Ionicons'
 
+import { ScreenHeader } from '@/components'
 import StarRating from '@/components/StarRating'
-import { useUserProfile } from '@/lib/query/hooks'
-import { useUserRatings } from '@/lib/query/hooks/useRatingQueries'
-import { Rating } from '@/lib/types/rating.types'
+import { useUserProfile, useUserRatings } from '@/hooks/query'
 import { useUserStore } from '@/store'
+import { Rating } from '@/types/rating.types'
 
 interface RatingItemProps {
     rating: Rating
@@ -23,15 +22,6 @@ interface RatingItemProps {
 }
 
 const RatingItem: React.FC<RatingItemProps> = ({ rating, onPress }) => {
-    const formatDate = (dateString: string): string => {
-        const date = new Date(dateString)
-        return date.toLocaleDateString('vi-VN', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        })
-    }
-
     return (
         <TouchableOpacity
             onPress={() => onPress(rating)}
@@ -53,19 +43,23 @@ const RatingItem: React.FC<RatingItemProps> = ({ rating, onPress }) => {
                     showValue={true}
                 />
                 <Text className="text-xs text-gray-500">
-                    {formatDate(rating.ratingDate)}
+                    {new Date(rating.ratingDate).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                    })}
                 </Text>
             </View>
 
             {/* Comment Preview */}
             <Text className="text-gray-700 text-sm leading-5" numberOfLines={3}>
-                {rating.comment || 'Không có bình luận'}
+                {rating.comment || 'No comment'}
             </Text>
 
             {/* View Detail Indicator */}
             <View className="flex-row items-center justify-end mt-3 pt-3 border-t border-gray-100">
                 <Text className="text-blue-600 text-sm font-JakartaMedium mr-1">
-                    Xem chi tiết
+                    View Details
                 </Text>
                 <Ionicons name="chevron-forward" size={16} color="#2563EB" />
             </View>
@@ -75,12 +69,10 @@ const RatingItem: React.FC<RatingItemProps> = ({ rating, onPress }) => {
 
 const Reviews = () => {
     const { user } = useUserStore()
-    const [refreshing, setRefreshing] = useState(false)
 
-    // Use userId to get user profile and extract renterId
     const userId = user?.id
 
-    // Get user profile to extract renterId for rating history
+    // Get user profile to extract renterId for ratings
     const {
         data: userProfileResponse,
         isLoading: profileLoading,
@@ -92,14 +84,7 @@ const Reviews = () => {
     const userData = (userProfileResponse as any)?.data?.data
     const renterId = userData?.renter?.renterId
 
-    console.log('📋 Reviews - User data:', {
-        userId,
-        hasUserData: !!userData,
-        renterId,
-        profileLoading,
-    })
-
-    // Fetch user ratings using renterId
+    // Fetch user ratings using renterId with auto-refresh
     const {
         data: ratings = [],
         isLoading: ratingsLoading,
@@ -109,7 +94,11 @@ const Reviews = () => {
         renterId || '',
         { pageSize: 50 },
         {
-            enabled: !!renterId, // Only fetch when we have renterId
+            enabled: !!renterId,
+            staleTime: 30 * 1000, // 30 seconds
+            refetchInterval: 60 * 1000, // Auto-refresh every 60 seconds
+            refetchOnWindowFocus: true,
+            refetchOnMount: true,
         }
     )
 
@@ -117,99 +106,63 @@ const Reviews = () => {
     useFocusEffect(
         React.useCallback(() => {
             if (renterId) {
-                console.log(
-                    '📱 Reviews tab focused - refreshing data with renterId:',
-                    renterId
-                )
                 refetch()
             }
         }, [renterId, refetch])
     )
 
-    const handleRefresh = async () => {
-        setRefreshing(true)
-        try {
-            await refetch()
-        } finally {
-            setRefreshing(false)
-        }
-    }
-
     const handleRatingPress = (rating: Rating) => {
         router.push({
             pathname: '/(root)/rating-detail',
-            params: {
-                ratingId: rating.id,
-            },
+            params: { ratingId: rating.id },
         })
     }
 
-    // Show loading if we don't have userId yet, profile is loading, or ratings are loading
-    if (
-        (!userId && !!user?.id) ||
-        profileLoading ||
-        (ratingsLoading && !refreshing)
-    ) {
+    // Loading state
+    const isLoading = (!userId && !!user?.id) || profileLoading || ratingsLoading
+    
+    if (isLoading) {
         return (
             <SafeAreaView className="flex-1 bg-gray-50">
-                <View className="bg-white px-5 py-4 border-b border-gray-200">
-                    <Text className="text-2xl font-JakartaBold">
-                        My Reviews
-                    </Text>
-                    <Text className="text-gray-600 mt-1">
-                        Reviews from your storage experiences
-                    </Text>
-                </View>
+                <ScreenHeader 
+                    title="My Reviews"
+                />
 
                 <View className="flex-1 justify-center items-center">
                     <ActivityIndicator size="large" color="#3b82f6" />
                     <Text className="mt-4 text-gray-600 font-JakartaMedium">
-                        {!userId
-                            ? 'Getting user information...'
-                            : profileLoading
-                              ? 'Loading user profile...'
-                              : 'Loading your reviews...'}
+                        {!userId ? 'Getting user information...' 
+                            : profileLoading ? 'Loading user profile...' 
+                            : 'Loading your reviews...'}
                     </Text>
                 </View>
             </SafeAreaView>
         )
     }
 
-    // Show error if profile loading failed or no renterId found
+    // Error state
     if (profileError || (!profileLoading && !renterId)) {
         return (
             <SafeAreaView className="flex-1 bg-gray-50">
-                <View className="bg-white px-5 py-4 border-b border-gray-200">
-                    <Text className="text-2xl font-JakartaBold">
-                        My Reviews
-                    </Text>
-                    <Text className="text-gray-600 mt-1">
-                        Reviews from your storage experiences
-                    </Text>
-                </View>
+                <ScreenHeader 
+                    title="My Reviews"
+                />
 
                 <View className="flex-1 justify-center items-center px-6">
                     <View className="bg-red-50 rounded-3xl p-6 mb-4">
-                        <Ionicons
-                            name="warning-outline"
-                            size={60}
-                            color="#ef4444"
-                        />
+                        <Ionicons name="warning-outline" size={60} color="#ef4444" />
                     </View>
                     <Text className="text-lg font-JakartaBold text-gray-600 mt-4">
                         Unable to load profile
                     </Text>
                     <Text className="text-sm text-gray-500 text-center mt-2 px-4">
-                        {profileError?.message ||
-                            'Cannot find renter profile information'}
+                        {profileError?.message || 'Cannot find renter profile information'}
                     </Text>
                     <TouchableOpacity
                         onPress={() => refetch()}
                         className="mt-6 bg-blue-500 px-8 py-4 rounded-2xl"
                     >
-                        <Text className="text-white font-JakartaBold">
-                            Try Again
-                        </Text>
+                        <Text className="text-white font-JakartaBold">Try Again</Text>
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
@@ -219,81 +172,45 @@ const Reviews = () => {
     return (
         <SafeAreaView className="flex-1 bg-gray-50">
             {/* Header */}
-            <View className="bg-white px-5 py-4 border-b border-gray-200">
-                <View className="flex-row items-center justify-between">
-                    <View className="flex-1">
-                        <Text className="text-2xl font-JakartaBold">
-                            My Reviews
-                        </Text>
-                        <Text className="text-gray-600 mt-1">
-                            Reviews from your storage experiences
-                        </Text>
-                    </View>
-
-                    <TouchableOpacity
-                        onPress={handleRefresh}
-                        className="bg-gray-100 rounded-full p-2 ml-3"
-                        disabled={refreshing}
-                    >
-                        <Ionicons name="refresh" size={20} color="#6b7280" />
-                    </TouchableOpacity>
-                </View>
-            </View>
+            <ScreenHeader 
+                title="My Reviews"
+                showActionButton={false}
+            />
 
             {/* Reviews List */}
             <ScrollView
                 className="flex-1 px-5"
                 showsVerticalScrollIndicator={false}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={handleRefresh}
-                        colors={['#3B82F6']}
-                        tintColor="#3B82F6"
-                    />
-                }
             >
                 <View className="py-4">
                     {ratingsError ? (
                         <View className="flex-1 items-center justify-center py-20">
                             <View className="bg-red-50 rounded-3xl p-6 mb-4">
-                                <Ionicons
-                                    name="warning-outline"
-                                    size={60}
-                                    color="#ef4444"
-                                />
+                                <Ionicons name="warning-outline" size={60} color="#ef4444" />
                             </View>
                             <Text className="text-lg font-JakartaBold text-gray-600 mt-4">
                                 Failed to load reviews
                             </Text>
                             <Text className="text-sm text-gray-500 text-center mt-2 px-4">
-                                {ratingsError?.message ||
-                                    'Something went wrong'}
+                                {ratingsError?.message || 'Something went wrong'}
                             </Text>
                             <TouchableOpacity
                                 onPress={() => refetch()}
                                 className="mt-6 bg-blue-500 px-8 py-4 rounded-2xl"
                             >
-                                <Text className="text-white font-JakartaBold">
-                                    Try Again
-                                </Text>
+                                <Text className="text-white font-JakartaBold">Try Again</Text>
                             </TouchableOpacity>
                         </View>
                     ) : ratings.length === 0 ? (
                         <View className="flex-1 items-center justify-center py-20">
                             <View className="bg-gray-100 w-20 h-20 rounded-full items-center justify-center mb-4">
-                                <Ionicons
-                                    name="star-outline"
-                                    size={40}
-                                    color="#9CA3AF"
-                                />
+                                <Ionicons name="star-outline" size={40} color="#9CA3AF" />
                             </View>
                             <Text className="text-xl font-JakartaBold text-gray-600 mb-2">
                                 No Reviews Yet
                             </Text>
                             <Text className="text-center text-gray-500 px-8">
-                                Complete storage orders and leave reviews to
-                                help other users make better choices
+                                Complete storage orders and leave reviews to help other users make better choices
                             </Text>
                         </View>
                     ) : (
@@ -301,7 +218,7 @@ const Reviews = () => {
                             {/* Summary */}
                             <View className="mb-4">
                                 <Text className="text-sm text-gray-500">
-                                    Tổng cộng {ratings.length} đánh giá
+                                    Total {ratings.length} reviews
                                 </Text>
                             </View>
 

@@ -1,8 +1,17 @@
+import { StarRating } from '@/components';
+import CustomModal from '@/components/CustomModal';
+import DetailHeader from '@/components/DetailHeader';
+import { useCreateRating, useUpdateRating, useUserProfile } from '@/hooks/query';
+import {
+  Rating,
+  RATING_VALIDATION,
+  RatingFormData,
+  RatingFormErrors
+} from '@/types/rating.types';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,16 +22,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-
-import StarRating from '../../components/StarRating';
-import { useUserProfile } from '../../lib/query/hooks';
-import { useCreateRating, useUpdateRating } from '../../lib/query/hooks/useRatingQueries';
-import {
-  Rating,
-  RATING_VALIDATION,
-  RatingFormData,
-  RatingFormErrors
-} from '../../lib/types/rating.types';
 
 const RatingFormScreen: React.FC = () => {
   // Navigation params
@@ -72,25 +71,18 @@ const RatingFormScreen: React.FC = () => {
 
   const [errors, setErrors] = useState<RatingFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Modal states
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   // API hooks
   const createRatingMutation = useCreateRating({
     onSuccess: (ratingId) => {
-      Alert.alert(
-        'Thành công!',
-        'Đánh giá của bạn đã được gửi thành công. Bạn có thể xem lại trong tab Reviews.',
-        [
-          {
-            text: 'Xem Reviews',
-            onPress: () => router.push('/(root)/(tabs)/reviews'),
-          },
-          {
-            text: 'Quay lại',
-            onPress: () => router.back(),
-            style: 'cancel',
-          },
-        ]
-      );
+      setSuccessMessage('Your rating has been submitted successfully. You can view it in the Reviews tab.');
+      setShowSuccessModal(true);
     },
     onError: (error) => {
       setErrors({ general: error.message });
@@ -100,21 +92,8 @@ const RatingFormScreen: React.FC = () => {
 
   const updateRatingMutation = useUpdateRating({
     onSuccess: (ratingId) => {
-      Alert.alert(
-        'Thành công!',
-        'Đánh giá của bạn đã được cập nhật thành công. Bạn có thể xem lại trong tab Reviews.',
-        [
-          {
-            text: 'Xem Reviews',
-            onPress: () => router.push('/(root)/(tabs)/reviews'),
-          },
-          {
-            text: 'Quay lại',
-            onPress: () => router.back(),
-            style: 'cancel',
-          },
-        ]
-      );
+      setSuccessMessage('Your rating has been updated successfully. You can view it in the Reviews tab.');
+      setShowSuccessModal(true);
     },
     onError: (error) => {
       setErrors({ general: error.message });
@@ -128,16 +107,16 @@ const RatingFormScreen: React.FC = () => {
 
     // Validate star rating
     if (formData.star < RATING_VALIDATION.MIN_STAR || formData.star > RATING_VALIDATION.MAX_STAR) {
-      newErrors.star = `Vui lòng chọn từ ${RATING_VALIDATION.MIN_STAR} đến ${RATING_VALIDATION.MAX_STAR} sao`;
+      newErrors.star = `Please select from ${RATING_VALIDATION.MIN_STAR} to ${RATING_VALIDATION.MAX_STAR} stars`;
     }
 
     // Validate comment
     if (!formData.comment.trim()) {
-      newErrors.comment = 'Bình luận là bắt buộc';
+      newErrors.comment = 'Comment is required';
     } else if (formData.comment.trim().length < RATING_VALIDATION.MIN_COMMENT_LENGTH) {
-      newErrors.comment = `Bình luận phải có ít nhất ${RATING_VALIDATION.MIN_COMMENT_LENGTH} ký tự`;
+      newErrors.comment = `Comment must be at least ${RATING_VALIDATION.MIN_COMMENT_LENGTH} characters`;
     } else if (formData.comment.length > RATING_VALIDATION.MAX_COMMENT_LENGTH) {
-      newErrors.comment = `Bình luận không được vượt quá ${RATING_VALIDATION.MAX_COMMENT_LENGTH} ký tự`;
+      newErrors.comment = `Comment cannot exceed ${RATING_VALIDATION.MAX_COMMENT_LENGTH} characters`;
     }
 
     setErrors(newErrors);
@@ -156,7 +135,8 @@ const RatingFormScreen: React.FC = () => {
     try {
       // Ensure we have the actual renter ID before proceeding
       if (!actualRenterId) {
-        Alert.alert('Lỗi', 'Không thể xác định thông tin người dùng. Vui lòng thử lại.');
+        setErrorMessage('Unable to identify user information. Please try again.');
+        setShowErrorModal(true);
         setIsSubmitting(false);
         return;
       }
@@ -208,11 +188,11 @@ const RatingFormScreen: React.FC = () => {
   // Show loading if user profile is still loading (only for new ratings)
   if (!isEditMode && profileLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
+      <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#3b82f6" />
-          <Text className="text-gray-600 mt-4 font-medium">
-            Đang tải thông tin người dùng...
+          <ActivityIndicator size="large" color="#2563eb" />
+          <Text className="text-text-secondary mt-4 font-JakartaMedium">
+            Loading user information...
           </Text>
         </View>
       </SafeAreaView>
@@ -222,20 +202,22 @@ const RatingFormScreen: React.FC = () => {
   // Show error if we can't get user profile (only for new ratings)
   if (!isEditMode && (profileError || !actualRenterId)) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
+      <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center px-6">
-          <Ionicons name="warning-outline" size={60} color="#ef4444" />
-          <Text className="text-lg font-semibold text-gray-900 mt-4 text-center">
-            Không thể tải thông tin
+          <View className="bg-danger-soft rounded-full p-6 mb-4">
+            <Ionicons name="warning-outline" size={48} color="#ef4444" />
+          </View>
+          <Text className="text-danger text-xl font-JakartaBold mb-2 text-center">
+            Unable to load information
           </Text>
-          <Text className="text-gray-600 mt-2 text-center">
-            Vui lòng thử lại sau hoặc liên hệ hỗ trợ
+          <Text className="text-text-secondary text-center mb-6">
+            Please try again later or contact support
           </Text>
           <TouchableOpacity
             onPress={() => router.back()}
-            className="mt-6 bg-blue-500 px-6 py-3 rounded-lg"
+            className="bg-primary rounded-xl px-6 py-3"
           >
-            <Text className="text-white font-semibold">Quay lại</Text>
+            <Text className="text-white font-JakartaBold">Go Back</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -243,79 +225,88 @@ const RatingFormScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-background">
+      <DetailHeader 
+        title={parsedExistingRating ? 'Edit Rating' : 'Rate Storage'}
+        subtitle={parsedExistingRating ? 'Update your experience' : 'Share your experience'}
+        showBackButton={true}
+        onBackPress={() => router.back()}
+      />
+
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
       >
-        {/* Header */}
-        <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-200">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="p-2 -ml-2"
-            accessibilityLabel="Quay lại"
-          >
-            <Ionicons name="arrow-back" size={24} color="#374151" />
-          </TouchableOpacity>
-          
-          <Text className="text-lg font-semibold text-gray-900">
-            {parsedExistingRating ? 'Sửa đánh giá' : 'Đánh giá kho lưu trữ'}
-          </Text>
-          
-          <View className="w-10" />
-        </View>
-
         <ScrollView 
           className="flex-1 px-4 py-6"
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Storage Information */}
-          <View className="bg-gray-50 rounded-lg p-4 mb-6">
-            <Text className="text-sm text-gray-500 mb-1">Kho lưu trữ</Text>
-            <Text className="text-base font-medium text-gray-900">
+          {/* Storage Information Card */}
+          <View className="bg-surface rounded-xl p-4 mb-6 shadow-sm">
+            <View className="flex-row items-center mb-3">
+              <View className="bg-accent-soft rounded-full p-2 mr-3">
+                <Ionicons name="business" size={18} color="#06b6d4" />
+              </View>
+              <Text className="text-base font-JakartaBold text-text">
+                Storage Location
+              </Text>
+            </View>
+            <Text className="text-text-secondary text-sm ml-11">
               {storageAddress}
             </Text>
           </View>
 
           {/* Star Rating Section */}
-          <View className="mb-6">
-            <Text className="text-base font-medium text-gray-900 mb-3">
-              Đánh giá của bạn *
-            </Text>
+          <View className="bg-surface rounded-xl p-6 mb-6 shadow-sm">
+            <View className="flex-row items-center mb-4">
+              <View className="bg-primary-soft rounded-full p-2 mr-3">
+                <Ionicons name="star" size={18} color="#2563eb" />
+              </View>
+              <Text className="text-base font-JakartaBold text-text">
+                Your Rating *
+              </Text>
+            </View>
             
-            <View className="items-center py-4">
+            <View className="items-center py-6 bg-background rounded-lg">
               <StarRating
                 rating={formData.star}
                 onRatingChange={handleStarChange}
                 size="large"
                 readonly={false}
-                className="mb-2"
+                className="mb-3"
               />
               
               {formData.star > 0 && (
-                <Text className="text-sm text-gray-600">
-                  {formData.star} sao
+                <Text className="text-text-secondary text-sm font-JakartaMedium">
+                  {formData.star} {formData.star === 1 ? 'star' : 'stars'}
                 </Text>
               )}
             </View>
 
             {errors.star && (
-              <Text className="text-red-500 text-sm mt-1">
-                {errors.star}
-              </Text>
+              <View className="bg-danger-soft rounded-lg p-3 mt-3">
+                <Text className="text-danger text-sm font-JakartaMedium">
+                  {errors.star}
+                </Text>
+              </View>
             )}
           </View>
 
           {/* Comment Section */}
-          <View className="mb-6">
-            <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-base font-medium text-gray-900">
-                Nhận xét *
-              </Text>
+          <View className="bg-surface rounded-xl p-6 mb-6 shadow-sm">
+            <View className="flex-row items-center justify-between mb-4">
+              <View className="flex-row items-center">
+                <View className="bg-accent-soft rounded-full p-2 mr-3">
+                  <Ionicons name="chatbubble-outline" size={18} color="#06b6d4" />
+                </View>
+                <Text className="text-base font-JakartaBold text-text">
+                  Your Comment *
+                </Text>
+              </View>
               <Text 
-                className={`text-sm ${
-                  isCommentLimitExceeded ? 'text-red-500' : 'text-gray-500'
+                className={`text-xs font-JakartaMedium ${
+                  isCommentLimitExceeded ? 'text-danger' : 'text-text-secondary'
                 }`}
               >
                 {commentCharCount}/{RATING_VALIDATION.MAX_COMMENT_LENGTH}
@@ -323,69 +314,104 @@ const RatingFormScreen: React.FC = () => {
             </View>
 
             <TextInput
-              className={`border rounded-lg p-4 text-base text-gray-900 ${
-                errors.comment ? 'border-red-500' : 'border-gray-300'
-              } ${isCommentLimitExceeded ? 'border-red-500' : ''}`}
+              className={`border-2 rounded-xl p-4 text-base text-text font-JakartaRegular ${
+                errors.comment ? 'border-danger bg-danger-soft' : 'border-border bg-background'
+              } ${isCommentLimitExceeded ? 'border-danger bg-danger-soft' : ''}`}
               value={formData.comment}
               onChangeText={handleCommentChange}
-              placeholder="Chia sẻ trải nghiệm của bạn về kho lưu trữ này..."
+              placeholder="Share your experience with this storage facility..."
               placeholderTextColor="#9CA3AF"
               multiline
               numberOfLines={6}
               textAlignVertical="top"
-              maxLength={RATING_VALIDATION.MAX_COMMENT_LENGTH + 50} // Allow slight overflow for warning
+              maxLength={RATING_VALIDATION.MAX_COMMENT_LENGTH + 50}
               returnKeyType="default"
               blurOnSubmit={false}
             />
 
             {errors.comment && (
-              <Text className="text-red-500 text-sm mt-1">
-                {errors.comment}
-              </Text>
+              <View className="bg-danger-soft rounded-lg p-3 mt-3">
+                <Text className="text-danger text-sm font-JakartaMedium">
+                  {errors.comment}
+                </Text>
+              </View>
             )}
 
-            <Text className="text-xs text-gray-500 mt-2">
-              Tối thiểu {RATING_VALIDATION.MIN_COMMENT_LENGTH} ký tự
+            <Text className="text-text-secondary text-xs mt-3 font-JakartaRegular">
+              Minimum {RATING_VALIDATION.MIN_COMMENT_LENGTH} characters required
             </Text>
           </View>
 
           {/* General Error */}
           {errors.general && (
-            <View className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <Text className="text-red-700 text-sm">
-                {errors.general}
-              </Text>
+            <View className="bg-danger-soft border border-danger/20 rounded-xl p-4 mb-6">
+              <View className="flex-row items-center">
+                <Ionicons name="alert-circle" size={20} color="#ef4444" />
+                <Text className="text-danger text-sm font-JakartaMedium ml-3 flex-1">
+                  {errors.general}
+                </Text>
+              </View>
             </View>
           )}
         </ScrollView>
 
         {/* Submit Button */}
-        <View className="px-4 py-4 border-t border-gray-200 bg-white">
+        <View className="px-4 py-4 border-t border-border bg-surface">
           <TouchableOpacity
-            className={`rounded-lg py-4 px-6 ${
+            className={`rounded-xl py-4 px-6 flex-row items-center justify-center ${
               isSubmitting || formData.star === 0 || !formData.comment.trim()
-                ? 'bg-gray-300'
-                : 'bg-blue-600'
+                ? 'bg-text-secondary/30'
+                : 'bg-primary shadow-md'
             }`}
             onPress={handleSubmit}
             disabled={isSubmitting || formData.star === 0 || !formData.comment.trim()}
-            accessibilityLabel={parsedExistingRating ? 'Cập nhật đánh giá' : 'Gửi đánh giá'}
+            accessibilityLabel={parsedExistingRating ? 'Update Rating' : 'Submit Rating'}
           >
             {isSubmitting ? (
-              <View className="flex-row items-center justify-center">
+              <>
                 <ActivityIndicator size="small" color="white" />
-                <Text className="text-white font-semibold ml-2">
-                  {parsedExistingRating ? 'Đang cập nhật...' : 'Đang gửi...'}
+                <Text className="text-white font-JakartaBold ml-3 text-base">
+                  {parsedExistingRating ? 'Updating...' : 'Submitting...'}
                 </Text>
-              </View>
+              </>
             ) : (
-              <Text className="text-white text-center font-semibold text-base">
-                {parsedExistingRating ? 'Cập nhật đánh giá' : 'Gửi đánh giá'}
-              </Text>
+              <>
+                <Ionicons 
+                  name={parsedExistingRating ? "checkmark-circle" : "send"} 
+                  size={20} 
+                  color="white" 
+                />
+                <Text className="text-white font-JakartaBold ml-3 text-base">
+                  {parsedExistingRating ? 'Update Rating' : 'Submit Rating'}
+                </Text>
+              </>
             )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Success Modal */}
+      <CustomModal
+        isVisible={showSuccessModal}
+        type="success"
+        title="Success!"
+        message={successMessage}
+        buttonText="Go to Reviews"
+        onConfirm={() => {
+          setShowSuccessModal(false);
+          router.push('/(root)/(tabs)/reviews');
+        }}
+      />
+
+      {/* Error Modal */}
+      <CustomModal
+        isVisible={showErrorModal}
+        type="error"
+        title="Error"
+        message={errorMessage}
+        buttonText="OK"
+        onConfirm={() => setShowErrorModal(false)}
+      />
     </SafeAreaView>
   );
 };

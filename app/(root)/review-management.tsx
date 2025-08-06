@@ -12,11 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useStoragesByKeeper } from '@/lib/query/hooks';
-import { useStorageRatings } from '@/lib/query/hooks/useRatingQueries';
-import { useKeeperIdByUserId } from '@/lib/query/hooks/useUserQueries';
-import { Rating } from '@/lib/types/rating.types';
+import { useKeeperIdByUserId, useStorageRatings, useStoragesByKeeper } from '@/hooks/query';
 import { useUserStore } from '@/store';
+import { Rating } from '../../types/rating.types';
 
 const RATING_COLORS = {
   5: '#10B981', // Green

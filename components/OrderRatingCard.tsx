@@ -9,8 +9,8 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
-import { useDeleteRating, useUserStorageRating } from '../lib/query/hooks/useRatingQueries';
-import { OrderRatingCardProps } from '../lib/types/rating.types';
+import { useDeleteRating, useUserStorageRating } from '@/hooks/query';
+import { OrderRatingCardProps } from '../types/rating.types';
 import StarRating from './StarRating';
 
 const OrderRatingCard: React.FC<OrderRatingCardProps> = ({

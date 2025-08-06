@@ -33,6 +33,28 @@ import onboarding2 from '@/assets/images/onboarding2.png'
 import onboarding3 from '@/assets/images/onboarding3.png'
 import signUpCar from '@/assets/images/signup-car.png'
 
+export const palette = {
+  primary: '#3B82F6',
+  secondary: '#6B7280',
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+  white: '#FFFFFF',
+  black: '#000000',
+  gray: {
+    50: '#F9FAFB',
+    100: '#F3F4F6',
+    200: '#E5E7EB',
+    300: '#D1D5DB',
+    400: '#9CA3AF',
+    500: '#6B7280',
+    600: '#4B5563',
+    700: '#374151',
+    800: '#1F2937',
+    900: '#111827',
+  },
+}
+
 export const images = {
     onboarding1,
     onboarding2,
@@ -73,28 +95,6 @@ export const icons = {
     locker
 }
 
-// Sophisticated neutral palette
-export const palette = {
-    background: '#fafafa',
-    surface: '#ffffff',
-    surfaceVariant: '#f8f9fa',
-    primary: '#2563eb',
-    primarySoft: '#dbeafe',
-    secondary: '#64748b',
-    accent: '#06b6d4',
-    accentSoft: '#e0f7fa',
-    success: '#059669',
-    successSoft: '#d1fae5',
-    warning: '#d97706',
-    warningSoft: '#fed7aa',
-    error: '#dc2626',
-    errorSoft: '#fee2e2',
-    text: '#1e293b',
-    textSecondary: '#64748b',
-    textTertiary: '#94a3b8',
-    border: '#e2e8f0',
-    shadow: 'rgba(15, 23, 42, 0.08)'
-}
 
 export const onboarding = [
     {

@@ -1,20 +1,18 @@
-import { CountdownDisplay } from '@/components/CountdownDisplay'
+import { ActiveStorageCard } from '@/components/ActiveStorageCard'
+import CustomModal from '@/components/CustomModal'
+import { QuickActionGrid, useQuickActions } from '@/components/QuickActionGrid'
 import { StorageDisplayCard } from '@/components/StorageDisplayCard'
 import { UserAvatar } from '@/components/UserAvatar'
-import { useRealTimeCountdown } from '@/hooks/useRealTimeCountdown'
+import useCustomModal from '@/hooks/useCustomModal'
 // import { useStorageNotifications } from '@/hooks/useStorageNotifications' // Disabled for Expo Go
-import { palette } from '@/constants'
-import { useBulkOrderCountdown } from '@/lib/hooks/useBulkOrderCountdown'
-import { AvailableStatus, useStorageList } from '@/lib/query/hooks'
-import { useCalculateFinalAmount, useUserOrders } from '@/lib/query/hooks/useOrderQueries'
-import { filterStoragesByRadius } from '@/lib/utils/distance'
+import { AvailableStatus, useStorageAll, useUserOrders } from '@/hooks/query'
+import { useBulkOrderCountdown } from '@/hooks/useBulkOrderCountdown'
 import { useLocationStore, useUserStore } from '@/store'
+import { filterStoragesByRadiusSync, formatAddressDetailed, formatAddressShort } from '@/utils'
 import * as Location from 'expo-location'
 import { useRouter } from 'expo-router'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-    Alert,
-    AppState,
     Linking,
     ScrollView,
     StatusBar,
@@ -22,24 +20,72 @@ import {
     TouchableOpacity,
     View
 } from 'react-native'
-import {
-    Easing,
-    useSharedValue,
-    withRepeat,
-    withTiming
-} from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from 'react-native-vector-icons/Ionicons'
 
 const Home = () => {
     const router = useRouter()
+    const [detailedAddress, setDetailedAddress] = useState<any>(null)
+    const [isGettingLocation, setIsGettingLocation] = useState(false) // 🔒 Prevent spam calls
+    const hasRequestedLocation = useRef(false) // 🔑 Track first location request
+    
+    // Custom modal hook
+    const { modalState, showError, hideModal } = useCustomModal()
+    
+    // State từ Storage
     const { setUserLocation, userAddress, userLatitude, userLongitude } = useLocationStore()
     const { user: currentUser } = useUserStore()
 
-    // Create a state to store detailed address info
-    const [detailedAddress, setDetailedAddress] = useState<any>(null)
+    //State từ API: Lấy danh sách kho đồ còn trống
+    const { data: storagesResponse } = useStorageAll({
+        status: AvailableStatus.AVAILABLE,
+        limit: 20,
+    });
 
-    // Function to open Google Maps
+    //State từ API: Lấy đơn hàng trong kho của người dùng
+    const userId = currentUser?.id || ''
+    const { data: activeOrdersResponse } = useUserOrders(userId, {
+        Status: 'IN_STORAGE',
+    });
+    
+    const activeOrders = useMemo(() => {
+        if (!activeOrdersResponse?.data?.data || !Array.isArray(activeOrdersResponse.data.data)) {
+            return [];
+        }
+        return activeOrdersResponse.data.data;
+    }, [activeOrdersResponse]);
+
+    //  Hàm để lọc kho theo bán kính
+    const nearbyStorages = useMemo(() => {
+        if (!userLatitude || !userLongitude || !storagesResponse?.data?.data) return [];
+        
+        return filterStoragesByRadiusSync(
+            userLatitude, 
+            userLongitude, 
+            storagesResponse.data.data, 
+            5 // 5km radius
+        ).slice(0, 5);
+    }, [userLatitude, userLongitude, storagesResponse]);
+    
+    //  Hàm để lấy ID đơn hàng đang hoạt động
+    const activeOrderIds = useMemo(() => {
+        return activeOrders.map((order: any) => order.id).filter(Boolean);
+    }, [activeOrders]);
+
+    // Dùng useBulkOrderCountdown hook để lấy thời gian đếm ngược
+    const {
+        loading: countdownLoading,
+        error: countdownError,
+        lastSyncTime,
+        getCountdownForOrder,
+        refreshFromServer: refreshCountdowns
+    } = useBulkOrderCountdown(activeOrderIds, 10 * 60 * 1000); // 10 phút
+
+    const isKeeper = currentUser?.role === 'KEEPER'
+
+    const quickActions = useQuickActions(currentUser?.role || 'RENTER', router)
+    
+    // Hàm để mở Google Maps
     const openGoogleMaps = useCallback((address: string) => {
         const encodedAddress = encodeURIComponent(address);
         const url = `https://maps.google.com/?q=${encodedAddress}`;
@@ -48,358 +94,187 @@ const Home = () => {
             if (supported) {
                 Linking.openURL(url);
             } else {
-                Alert.alert('Error', 'Cannot open Google Maps');
+                showError('Error', 'Cannot open Google Maps')
             }
         });
-    }, [])
+    }, [showError])
 
-
-    // Fetch nearby storages (5km radius)
-    const { data: storagesResponse } = useStorageList({
-        status: AvailableStatus.AVAILABLE,
-        limit: 20,
-    });
-
-    const nearbyStorages = useMemo(() => {
-        if (!userLatitude || !userLongitude || !storagesResponse?.data?.data) return [];
-        
-        return filterStoragesByRadius(
-            userLatitude, 
-            userLongitude, 
-            storagesResponse.data.data, 
-            5 // 5km radius
-        ).slice(0, 5); // Top 5 nearest
-    }, [userLatitude, userLongitude, storagesResponse]);
-
-    // Fetch user orders using corrected userId-based API
-    const userId = currentUser?.id
-    const { data: activeOrdersResponse } = useUserOrders(userId || '', {
-        Status: 'IN_STORAGE',
-    });
-    
-    const activeOrders = useMemo(() => {
-        return (activeOrdersResponse as any)?.data?.data || [];
-    }, [activeOrdersResponse]);
-
-    // Extract order IDs for bulk countdown
-    const activeOrderIds = useMemo(() => {
-        return activeOrders.map((order: any) => order.id).filter(Boolean);
-    }, [activeOrders]);
-
-    // Use bulk countdown hook with 10-minute server sync interval
-    const {
-        loading: countdownLoading,
-        error: countdownError,
-        lastSyncTime,
-        getCountdownForOrder,
-        refreshFromServer: refreshCountdowns
-    } = useBulkOrderCountdown(activeOrderIds, 10 * 60 * 1000); // 10 minutes
-
-    // Log countdown sync status
-    useEffect(() => {
-        if (lastSyncTime) {
-            console.log('🕒 Last countdown sync:', lastSyncTime.toLocaleTimeString());
-        }
-        if (countdownError) {
-            console.error('❌ Countdown error:', countdownError);
-        }
-    }, [lastSyncTime, countdownError]);
-
-    // Subtle animations
-    const breatheValue = useSharedValue(1)
-    const floatValue = useSharedValue(0)
-
-    useEffect(() => {
-        breatheValue.value = withRepeat(
-            withTiming(1.02, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
-            -1,
-            true
-        )
-
-        floatValue.value = withRepeat(
-            withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
-            -1,
-            true
-        )
-    }, [breatheValue, floatValue])
-
-    const formatAddressShort = useCallback((addressObj: any, maxLength = 45) => {
-        if (!addressObj) return '';
-        
-        const { street, streetNumber, district, city, region } = addressObj;
-        
-        // Build address parts in priority order
-        const parts = [];
-        
-        if (streetNumber && street) {
-            parts.push(`${streetNumber} ${street}`);
-        } else if (street) {
-            parts.push(street);
-        }
-        
-        if (district) {
-            parts.push(district);
-        }
-        
-        if (city) {
-            if (city.includes('Hồ Chí Minh') || city.includes('Ho Chi Minh')) {
-                parts.push('TP.HCM');
-            } else if (city.includes('Hà Nội')) {
-                parts.push('Hà Nội');
-            } else {
-                parts.push(city);
-            }
-        } else if (region) {
-            parts.push(region);
-        }
-        
-        let result = parts.filter(Boolean).join(', ');
-        return result.length > maxLength ? result.slice(0, maxLength - 3) + '...' : result;
-    }, [])
-
-    // Enhanced address formatting with more detailed info
-    const formatAddressDetailed = useCallback((addressObj: any) => {
-        if (!addressObj) return { primary: 'Unknown Location', secondary: '' };
-        
-        const { 
-            street, 
-            streetNumber, 
-            name, 
-            city, 
-            district, 
-            region,
-            subregion,
-            formattedAddress
-        } = addressObj;
-
-        // Optimized: Only log once per unique address object to prevent render loops
-        // console.log('Address Object:', addressObj); // Debug log - DISABLED to prevent continuous rendering
-
-        // If we have formattedAddress, use it as a base but make it more readable
-        if (formattedAddress) {
-            // Extract meaningful parts from formatted address
-            const addressParts = formattedAddress.split(', ');
-            
-            // Primary: Street number + Street name (most specific)
-            let primary = '';
-            if (streetNumber && street) {
-                primary = `${streetNumber} ${street}`;
-            } else if (name && streetNumber) {
-                primary = `${streetNumber} ${street || 'Đường Nam Cao'}`;
-            } else if (addressParts[0]) {
-                primary = addressParts[0]; // First part usually most specific
-            }
-
-            // Secondary: Area hierarchy (Ward → District → City)
-            let secondary = '';
-            const secondaryParts = [];
-            
-            // Add subregion (Thủ Đức, Quận X, etc.)
-            if (subregion && subregion !== region) {
-                if (subregion.includes('Thủ Đức')) {
-                    secondaryParts.push('TP. Thủ Đức');
-                } else {
-                    secondaryParts.push(subregion);
-                }
-            }
-            
-            // Add region (TP.HCM, Hà Nội, etc.)  
-            if (region) {
-                if (region.includes('Hồ Chí Minh') || region.includes('Ho Chi Minh')) {
-                    secondaryParts.push('TP.HCM');
-                } else if (region.includes('Hà Nội')) {
-                    secondaryParts.push('Hà Nội');
-                } else {
-                    secondaryParts.push(region);
-                }
-            }
-
-            secondary = secondaryParts.slice(0, 2).join(', ');
-
-            return {
-                primary: primary.length > 40 ? primary.slice(0, 37) + '...' : primary,
-                secondary: secondary.length > 35 ? secondary.slice(0, 32) + '...' : secondary,
-                fullAddress: formattedAddress // Keep full address for Google Maps
-            };
-        }
-
-        // Fallback to manual construction if no formattedAddress
-        let primary = '';
-        if (name && !name.includes('Unnamed')) {
-            primary = name;
-        } else if (streetNumber && street) {
-            primary = `${streetNumber} ${street}`;
-        } else if (street) {
-            primary = street;
-        } else {
-            primary = district || city || subregion || 'Unknown Location';
-        }
-
-        let secondary = '';
-        const secondaryParts = [];
-        
-        if (district && !primary.includes(district)) {
-            secondaryParts.push(district);
-        }
-        if (subregion && subregion !== district) {
-            secondaryParts.push(subregion);
-        }
-        if (region) {
-            if (region.includes('Hồ Chí Minh')) {
-                secondaryParts.push('TP.HCM');
-            } else if (region.includes('Hà Nội')) {
-                secondaryParts.push('Hà Nội');
-            } else {
-                secondaryParts.push(region);
-            }
-        }
-
-        secondary = secondaryParts.slice(0, 3).join(', ');
-
-        return {
-            primary: primary.length > 40 ? primary.slice(0, 37) + '...' : primary,
-            secondary: secondary.length > 35 ? secondary.slice(0, 32) + '...' : secondary,
-            fullAddress: `${primary}, ${secondary}` // Construct full address
-        };
-    }, [])
-
+    // 📍 Lấy vị trí "chuẩn" một lần duy nhất - KHÔNG drift, KHÔNG spam
     const requestLocationPermission = useCallback(async () => {
+        // 🔒 Ngăn gọi nhiều lần cùng lúc
+        if (isGettingLocation) {
+            console.log('🚫 Location request already in progress, skipping...')
+            return
+        }
+
         try {
+            setIsGettingLocation(true) // 🔒 Lock để ngăn spam
+            
+            // 1. Xin quyền truy cập location
             let { status } = await Location.requestForegroundPermissionsAsync()
             if (status !== 'granted') {
-                Alert.alert(
+                showError(
                     'Location Permission Required',
-                    'Please enable location services to find nearby storage options.',
-                    [{ text: 'OK' }]
+                    'Please enable location services to find nearby storage options.'
                 )
                 return
             }
             
-            // Get current position with timeout
-            let location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Balanced,
-            })
+            console.log('🎯 Starting high-accuracy location acquisition...')
             
-            // Set location with coordinates even if reverse geocoding fails
-            const locationData: any = {
-                latitude: location.coords?.latitude,
-                longitude: location.coords?.longitude,
-                address: 'Current Location', // Default fallback
-                addressObj: null, // Store full address object
-            }
-            
-            // Try reverse geocoding with error handling
-            try {
-                const address = await Location.reverseGeocodeAsync({
-                    latitude: location.coords?.latitude!,
-                    longitude: location.coords?.longitude!,
-                })
-                
-                if (address && address.length > 0) {
-                    locationData.addressObj = address[0]; // Store full object
-                    locationData.address = formatAddressShort(address[0]);
-                    setDetailedAddress(address[0]); // Store detailed address for UI
+            // 2. Tạm thời "watch" với độ chính xác cao nhất
+            const subscription = await Location.watchPositionAsync(
+                {
+                    accuracy: Location.Accuracy.BestForNavigation, // ≈ 1-3m accuracy
+                    timeInterval: 1000,         // 1s/lần (Android)
+                    distanceInterval: 0,        // Luôn gửi (iOS)
+                    mayShowUserSettingsDialog: true
+                },
+                async (location) => {
+                    console.log(`📍 GPS reading: ±${location.coords.accuracy?.toFixed(1)}m accuracy`)
                     
-                    // Optimized debug logs - Only log once to prevent continuous rendering
-                    console.log('🏠 Location Updated:', {
-                        latitude: location.coords?.latitude,
-                        longitude: location.coords?.longitude,
-                        address: locationData.address
-                    });
+                    // 3. Chỉ nhận khi đủ tốt (≤ 20m accuracy)
+                    if (location.coords.accuracy && location.coords.accuracy <= 20) {
+                        console.log('✅ High accuracy achieved! Stopping GPS tracking...')
+                        subscription.remove() // ⚠️ HUỶ ngay để ngừng drift
+                        setIsGettingLocation(false) // 🔓 Unlock
+                        
+                        // 4. Tạo location data với accuracy info
+                        const locationData: any = {
+                            latitude: location.coords.latitude,
+                            longitude: location.coords.longitude,
+                            accuracy: location.coords.accuracy,
+                            address: 'Current Location', // Default fallback
+                            addressObj: null,
+                            timestamp: new Date().toISOString()
+                        }
+                        
+                        // 5. Reverse geocoding với error handling
+                        try {
+                            const address = await Location.reverseGeocodeAsync({
+                                latitude: location.coords.latitude,
+                                longitude: location.coords.longitude,
+                            })
+                            
+                            if (address && address.length > 0) {
+                                locationData.addressObj = address[0]
+                                locationData.address = formatAddressShort(address[0] as any)
+                                setDetailedAddress(address[0])
+                                console.log(`📧 Address: ${locationData.address}`)
+                            }
+                        } catch (geocodingError) {
+                            console.warn('Reverse geocoding failed:', geocodingError)
+                        }
+                        
+                        // 6. Lưu vào state một lần duy nhất
+                        setUserLocation(locationData)
+                        console.log(`🎉 Location saved: ${location.coords.latitude}, ${location.coords.longitude} (±${location.coords.accuracy}m)`)
+                    }
                 }
-            } catch (geocodingError) {
-                console.warn('Reverse geocoding failed:', geocodingError)
-                // Keep the default 'Current Location' address
+            )
+            
+            // 7. Fallback: huỷ sau 8s nếu chưa đủ chính xác
+            const fallbackTimer = setTimeout(() => {
+                console.log('⏰ Location timeout - using best available reading')
+                subscription.remove()
+                setIsGettingLocation(false) // 🔓 Unlock on timeout
+                
+                // Fallback với getCurrentPositionAsync nếu watch không thành công
+                Location.getCurrentPositionAsync({
+                    accuracy: Location.Accuracy.High,
+                }).then(async (fallbackLocation) => {
+                    const locationData: any = {
+                        latitude: fallbackLocation.coords.latitude,
+                        longitude: fallbackLocation.coords.longitude,
+                        accuracy: fallbackLocation.coords.accuracy,
+                        address: 'Current Location',
+                        addressObj: null,
+                        timestamp: new Date().toISOString()
+                    }
+                    
+                    try {
+                        const address = await Location.reverseGeocodeAsync({
+                            latitude: fallbackLocation.coords.latitude,
+                            longitude: fallbackLocation.coords.longitude,
+                        })
+                        
+                        if (address && address.length > 0) {
+                            locationData.addressObj = address[0]
+                            locationData.address = formatAddressShort(address[0] as any)
+                            setDetailedAddress(address[0])
+                        }
+                    } catch (geocodingError) {
+                        console.warn('Fallback reverse geocoding failed:', geocodingError)
+                    }
+                    
+                    setUserLocation(locationData)
+                    console.log(`📍 Fallback location: ±${fallbackLocation.coords.accuracy?.toFixed(1)}m`)
+                }).catch((fallbackError) => {
+                    console.error('Fallback location failed:', fallbackError)
+                    showError(
+                        'Location Unavailable',
+                        'Unable to get your current location. Please check your GPS settings.'
+                    )
+                })
+            }, 8000) // 8 giây timeout
+            
+            // Cleanup timer khi có kết quả sớm
+            const originalRemove = subscription.remove
+            subscription.remove = () => {
+                clearTimeout(fallbackTimer)
+                setIsGettingLocation(false) // 🔓 Unlock on success
+                originalRemove.call(subscription)
             }
             
-            setUserLocation(locationData)
         } catch (error) {
+            setIsGettingLocation(false) // 🔓 Unlock on error
             console.error('Location permission error:', error)
             
             // Provide user feedback for common errors
             const errorMessage = error instanceof Error ? error.message : String(error)
             if (errorMessage?.includes('UNAVAILABLE') || errorMessage?.includes('NETWORK')) {
-                Alert.alert(
+                showError(
                     'Location Service Unavailable',
-                    'Location services are temporarily unavailable. Please check your internet connection and try again.',
-                    [{ text: 'OK' }]
+                    'Location services are temporarily unavailable. Please check your internet connection and try again.'
                 )
             } else if (errorMessage?.includes('TIMEOUT')) {
-                Alert.alert(
+                showError(
                     'Location Timeout',
-                    'Getting your location is taking too long. Please try again.',
-                    [{ text: 'OK' }]
+                    'Getting your location is taking too long. Please try again.'
+                )
+            } else {
+                showError(
+                    'Location Error',
+                    'Failed to get your location. Please ensure GPS is enabled and try again.'
                 )
             }
         }
-    }, [setUserLocation, formatAddressShort])
+    }, [isGettingLocation, setUserLocation, showError]) // 🔑 Simplified dependencies
 
-    useEffect(() => {
+    // 🔄 Manual refresh function for button
+    const handleRefreshLocation = useCallback(() => {
+        console.log('🔄 Manual location refresh requested')
         requestLocationPermission()
     }, [requestLocationPermission])
 
-    const isKeeper = currentUser?.role === 'KEEPER'
+    useEffect(() => {
+        // Chỉ gọi 1 lần khi component mount
+        if (!hasRequestedLocation.current) {
+            hasRequestedLocation.current = true
+            requestLocationPermission()
+        }
+    }, [requestLocationPermission]) // Vẫn cần dependency nhưng có guard
 
-    // Quick Actions based on user role
-    const renterQuickActions = [
-        {
-            title: 'Storage',
-            icon: 'location',
-            color: palette.primary,
-            onPress: () => router.push('/(root)/find-storage'),
-        },
-        {
-            title: 'My Orders',
-            icon: 'bag',
-            color: palette.accent,
-            onPress: () => router.push('/(root)/(tabs)/orders'),
-        },
-        {
-            title: 'Reviews',
-            icon: 'heart',
-            color: palette.success,
-            onPress: () => router.push('/(root)/(tabs)/reviews'),
-        },
-        {
-            title: 'Profile',
-            icon: 'person-circle',
-            color: palette.warning,
-            onPress: () => router.push('/(root)/(tabs)/profile'),
-        },
-    ]
+    useEffect(() => {
+        if (countdownError) {
+            console.error('❌ Countdown error:', countdownError);
+        }
+    }, [countdownError]);
 
-    const keeperQuickActions = [
-        {
-            title: 'Storages',
-            icon: 'location',
-            color: palette.primary,
-            onPress: () => router.push('/(root)/keeper-storages'),
-        },
-        {
-            title: 'Orders',
-            icon: 'bag',
-            color: palette.accent,
-            onPress: () => router.push('/(root)/order-management'),
-        },
-        {
-            title: 'Reviews',
-            icon: 'heart',
-            color: palette.success,
-            onPress: () => router.push('/(root)/review-management'),
-        },
-        {
-            title: 'Profile',
-            icon: 'person-circle',
-            color: palette.warning,
-            onPress: () => router.push('/(root)/(tabs)/profile'),
-        },
-    ]
-
-    const quickActions = isKeeper ? keeperQuickActions : renterQuickActions
 
     return (
         <View className="flex-1 bg-background">
-            <StatusBar barStyle="dark-content" backgroundColor={palette.background} />
+            <StatusBar barStyle="dark-content" backgroundColor="#fafafa" />
             <SafeAreaView className="flex-1">
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
                     {/* Header: location info and user profile */}
@@ -415,68 +290,81 @@ const Home = () => {
                                 </Text>
                             </View>
                             
-                            <View className="relative">
-                                <UserAvatar 
-                                    username={currentUser?.username || 'User'} 
-                                    size={44} 
-                                />
-                                {/* Online status indicator */}
-                                <View className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-emerald-600 border-2 border-white" />
-                            </View>
+                            <UserAvatar 
+                                username={currentUser?.username || 'User'} 
+                                size={44} 
+                            />
                         </View>
 
-                        {/* Location section - enhanced with detailed info */}
-                        <TouchableOpacity 
-                            className="flex-row items-center"
-                            onPress={() => {
-                                if (detailedAddress) {
-                                    const { fullAddress } = formatAddressDetailed(detailedAddress);
-                                    openGoogleMaps(fullAddress || userAddress || '');
-                                } else if (userAddress) {
-                                    openGoogleMaps(userAddress);
-                                }
-                            }}
-                            activeOpacity={0.7}
-                        >
-                            <View className="bg-primary-soft rounded-lg p-1.5 mr-2">
-                                <Ionicons name="location" size={14} color={palette.primary} />
-                            </View>
-                            <View className="flex-1">
-                                {detailedAddress ? (
-                                    (() => {
-                                        const { primary, secondary } = formatAddressDetailed(detailedAddress);
-                                        return (
-                                            <>
-                                                <Text className="text-text text-sm font-semibold leading-4 mb-0.5" numberOfLines={1}>
-                                                    {primary}
-                                                </Text>
-                                                {secondary && (
-                                                    <Text className="text-text-secondary text-xs font-medium leading-3" numberOfLines={1}>
-                                                        {secondary}
+                        {/* Location section - enhanced with detailed info and refresh button */}
+                        <View className="flex-row items-center">
+                            {/* Main location info */}
+                            <TouchableOpacity 
+                                className="flex-row items-center flex-1"
+                                onPress={() => {
+                                    if (detailedAddress) {
+                                        const { fullAddress } = formatAddressDetailed(detailedAddress);
+                                        openGoogleMaps(fullAddress || userAddress || '');
+                                    } else if (userAddress) {
+                                        openGoogleMaps(userAddress);
+                                    }
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <View className="bg-primary-soft rounded-lg p-1.5 mr-2">
+                                    <Ionicons name="location" size={14} color="#2563eb" />
+                                </View>
+                                <View className="flex-1">
+                                    {detailedAddress ? (
+                                        (() => {
+                                            const { primary, secondary } = formatAddressDetailed(detailedAddress);
+                                            return (
+                                                <>
+                                                    <Text className="text-text text-sm font-semibold leading-4 mb-0.5" numberOfLines={1}>
+                                                        {primary}
                                                     </Text>
-                                                )}
-                                            </>
-                                        );
-                                    })()
-                                ) : (
-                                    <>
-                                        <Text className="text-text-secondary text-xs font-medium mb-0.5">
-                                            LOCATION
-                                        </Text>
-                                        <Text className="text-text text-sm font-semibold leading-4" numberOfLines={2}>
-                                            {userAddress || 'Detecting your location...'}
-                                        </Text>
-                                    </>
-                                )}
-                            </View>
-                            <Ionicons name="open-outline" size={12} color={palette.textSecondary} className="ml-1" />
-                        </TouchableOpacity>
+                                                    {secondary && (
+                                                        <Text className="text-text-secondary text-xs font-medium leading-3" numberOfLines={1}>
+                                                            {secondary}
+                                                        </Text>
+                                                    )}
+                                                </>
+                                            );
+                                        })()
+                                    ) : (
+                                        <>
+                                            <Text className="text-text-secondary text-xs font-medium mb-0.5">
+                                                LOCATION
+                                            </Text>
+                                            <Text className="text-text text-sm font-semibold leading-4" numberOfLines={2}>
+                                                {userAddress || 'Detecting your location...'}
+                                            </Text>
+                                        </>
+                                    )}
+                                </View>
+                                <Ionicons name="open-outline" size={12} color="#64748b" className="ml-1" />
+                            </TouchableOpacity>
+                            
+                            {/* Refresh location button */}
+                            <TouchableOpacity 
+                                className={`ml-2 p-2 rounded-lg ${isGettingLocation ? 'bg-amber-50' : 'bg-primary-soft'}`}
+                                onPress={handleRefreshLocation}
+                                activeOpacity={0.7}
+                                disabled={isGettingLocation} // Disable khi đang get location
+                            >
+                                <Ionicons 
+                                    name={isGettingLocation ? "hourglass" : "refresh"} 
+                                    size={14} 
+                                    color={isGettingLocation ? "#d97706" : "#2563eb"} 
+                                />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Main Action Card - Different for Keeper vs Renter */}
                     <View className="mt-4 mx-4">
                         <View style={{
-                            shadowColor: palette.primary,
+                            shadowColor: '#2563eb',
                             shadowOpacity: 0.25,
                             shadowRadius: 20,
                             shadowOffset: { width: 0, height: 10 },
@@ -641,11 +529,11 @@ const Home = () => {
                                                 onPress={() => router.push('/(root)/find-storage')}
                                                 activeOpacity={0.9}
                                             >
-                                                <Ionicons name="location" size={18} color={palette.primary} />
+                                                <Ionicons name="location" size={18} color="#2563eb" />
                                                 <Text className="text-text text-base font-semibold ml-2.5 flex-1">
                                                     Browse Storage
                                                 </Text>
-                                                <Ionicons name="arrow-forward" size={18} color={palette.primary} />
+                                                <Ionicons name="arrow-forward" size={18} color="#2563eb" />
                                             </TouchableOpacity>
                                         </>
                                     )}
@@ -654,30 +542,14 @@ const Home = () => {
                         </View>
                     </View>
 
-                    {/* Quick Actions grid - 4 icons in 1 row */}
+                    {/* Quick Actions Grid */}
                     <View className="mt-5 mx-4">
-                        <View className="flex-row justify-between">
-                            {quickActions.map((action, idx) => (
-                                <TouchableOpacity 
-                                    key={action.title} 
-                                    onPress={action.onPress} 
-                                    className="w-[23%] aspect-square items-center justify-center bg-surface rounded-2xl p-2 shadow-sm"
-                                    style={{
-                                        shadowColor: palette.shadow,
-                                        shadowOpacity: 0.06,
-                                        shadowRadius: 8,
-                                        shadowOffset: { width: 0, height: 2 },
-                                        elevation: 4
-                                    }}
-                                    activeOpacity={0.8}
-                                >
-                                    <Ionicons name={action.icon as any} size={32} color={action.color} />
-                                    <Text className="text-text text-xs font-semibold text-center mt-1 leading-3">
-                                        {action.title}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+                        <QuickActionGrid 
+                            actions={quickActions}
+                            columns={4}
+                            variant="default"
+                            spacing="normal"
+                        />
                     </View>
 
                     {/* Content Section - Different for Keeper vs Renter */}
@@ -686,7 +558,7 @@ const Home = () => {
                             <>
                                 {/* Keeper Dashboard - Content removed per user request */}
                                 <View className="bg-surface rounded-2xl p-5 items-center shadow-sm">
-                                    <Ionicons name="business" size={48} color={palette.textSecondary} />
+                                    <Ionicons name="business" size={48} color="#64748b" />
                                     <Text className="text-text-secondary text-base font-semibold mt-3 text-center">
                                         Keeper Dashboard
                                     </Text>
@@ -702,11 +574,11 @@ const Home = () => {
                                     <View className="mb-7">
                                         {/* Enhanced Header Section */}
                                         <View className="flex-row justify-between items-center mb-4 px-1">
-                                            <View className="flex-row items-center">
+                                            <View className="flex-row items-center flex-1 mr-3">
                                                 <View className="bg-primary-soft rounded-xl p-2 mr-3">
-                                                    <Ionicons name="location" size={20} color={palette.primary} />
+                                                    <Ionicons name="location" size={20} color="#2563eb" />
                                                 </View>
-                                                <View>
+                                                <View className="flex-1">
                                                     <Text className="text-text text-lg font-bold mb-0.5">
                                                         Nearby Storage
                                                     </Text>
@@ -721,9 +593,9 @@ const Home = () => {
                                                 activeOpacity={0.8}
                                             >
                                                 <Text className="text-primary text-sm font-semibold mr-1">
-                                                    See all
+                                                    All
                                                 </Text>
-                                                <Ionicons name="arrow-forward" size={12} color={palette.primary} />
+                                                <Ionicons name="arrow-forward" size={12} color="#2563eb" />
                                             </TouchableOpacity>
                                         </View>
                                         
@@ -759,20 +631,20 @@ const Home = () => {
                                     <View className="mb-7">
                                         {/* Enhanced Header Section */}
                                         <View className="flex-row justify-between items-center mb-4 px-1">
-                                            <View className="flex-row items-center">
+                                            <View className="flex-row items-center flex-1 mr-3">
                                                 <View className="bg-cyan-50 rounded-xl p-2 mr-3">
                                                     <Ionicons name="cube" size={20} color="#06b6d4" />
                                                 </View>
-                                                <View>
+                                                <View className="flex-1">
                                                     <Text className="text-slate-800 text-lg font-bold mb-0.5">
                                                         My Active Storage
                                                     </Text>
                                                     <Text className="text-slate-600 text-sm font-medium">
-                                                        {activeOrders.length} item{activeOrders.length > 1 ? 's' : ''} currently stored
+                                                        {activeOrders.length} item{activeOrders.length > 1 ? 's' : ''} stored
                                                         {lastSyncTime && (
                                                             <Text className="text-xs text-blue-600">
-                                                                {' • Synced '}
-                                                                {Math.floor((new Date().getTime() - lastSyncTime.getTime()) / 60000)}m ago
+                                                                {' • '}
+                                                                {Math.floor((new Date().getTime() - lastSyncTime.getTime()) / 60000)}m
                                                             </Text>
                                                         )}
                                                     </Text>
@@ -787,7 +659,7 @@ const Home = () => {
                                                     <Ionicons 
                                                         name="refresh" 
                                                         size={14} 
-                                                        color={palette.primary} 
+                                                        color="#2563eb" 
                                                     />
                                                 </TouchableOpacity>
                                                 <TouchableOpacity 
@@ -796,9 +668,9 @@ const Home = () => {
                                                     activeOpacity={0.8}
                                                 >
                                                     <Text className="text-accent text-sm font-semibold mr-1">
-                                                        View all
+                                                        All
                                                     </Text>
-                                                    <Ionicons name="arrow-forward" size={12} color={palette.accent} />
+                                                    <Ionicons name="arrow-forward" size={12} color="#06b6d4" />
                                                 </TouchableOpacity>
                                             </View>
                                         </View>
@@ -825,11 +697,11 @@ const Home = () => {
                                     <View className="mb-7">
                                         {/* Enhanced Header Section */}
                                         <View className="flex-row justify-between items-center mb-4 px-1">
-                                            <View className="flex-row items-center">
+                                            <View className="flex-row items-center flex-1 mr-3">
                                                 <View className="bg-surfaceVariant rounded-xl p-2 mr-3">
-                                                    <Ionicons name="cube-outline" size={20} color={palette.textSecondary} />
+                                                    <Ionicons name="cube-outline" size={20} color="#64748b" />
                                                 </View>
-                                                <View>
+                                                <View className="flex-1">
                                                     <Text className="text-text text-lg font-bold mb-0.5">
                                                         My Stored Items
                                                     </Text>
@@ -844,16 +716,16 @@ const Home = () => {
                                                 activeOpacity={0.8}
                                             >
                                                 <Text className="text-text-secondary text-sm font-semibold mr-1">
-                                                    See all
+                                                    All
                                                 </Text>
-                                                <Ionicons name="arrow-forward" size={12} color={palette.textSecondary} />
+                                                <Ionicons name="arrow-forward" size={12} color="#64748b" />
                                             </TouchableOpacity>
                                         </View>
                                         
                                         {/* Enhanced Empty State */}
                                         <View className="bg-surface rounded-3xl p-6 shadow-sm items-center">
                                             <View className="bg-primary-soft rounded-3xl p-5 mb-4">
-                                                <Ionicons name="cube-outline" size={40} color={palette.primary} />
+                                                <Ionicons name="cube-outline" size={40} color="#2563eb" />
                                             </View>
                                             <Text className="text-text text-lg font-bold mb-2 text-center">
                                                 No Active Storage
@@ -864,7 +736,7 @@ const Home = () => {
                                             <TouchableOpacity 
                                                 className="bg-primary rounded-2xl py-3 px-6 flex-row items-center shadow-lg"
                                                 style={{
-                                                    shadowColor: palette.primary,
+                                                    shadowColor: '#2563eb',
                                                     shadowOpacity: 0.3,
                                                     shadowRadius: 8,
                                                     shadowOffset: { width: 0, height: 4 },
@@ -887,216 +759,16 @@ const Home = () => {
 
                 </ScrollView>
             </SafeAreaView>
+            
+            <CustomModal
+                isVisible={modalState.isVisible}
+                type={modalState.type}
+                title={modalState.title}
+                message={modalState.message}
+                onConfirm={hideModal}
+            />
         </View>
     )
 }
-
-// ActiveStorageCard Component with App State Management (Notifications disabled for Expo Go)
-const ActiveStorageCard = React.memo(({ 
-    order, 
-    serverCountdown = null, 
-    loading = false 
-}: { 
-    order: any; 
-    serverCountdown?: any; 
-    loading?: boolean; 
-}) => {
-    const router = useRouter();
-    const [appState, setAppState] = useState(AppState.currentState);
-    // const { scheduleOrderNotifications } = useStorageNotifications(); // Disabled for Expo Go
-    
-    const { data: finalAmountData } = useCalculateFinalAmount(order.id, {
-        refetchInterval: 30000, // Update every 30s
-        enabled: !!order.id
-    });
-
-    // Stabilize the countdown inputs to prevent infinite re-renders
-    const startKeepTime = useMemo(() => {
-        // Use server countdown data first, then fallback to order data
-        return serverCountdown?.startKeepTime || order.startKeepTime || new Date().toISOString();
-    }, [serverCountdown?.startKeepTime, order.startKeepTime]);
-    
-    const estimatedDays = useMemo(() => {
-        // Use server countdown data first, then fallback to order data
-        return serverCountdown?.estimatedDays || order.estimatedDays || 1;
-    }, [serverCountdown?.estimatedDays, order.estimatedDays]);
-    
-    // Always call hooks, but use server countdown if available
-    const localCountdown = useRealTimeCountdown(startKeepTime, estimatedDays);
-    const countdown = serverCountdown || localCountdown;
-
-    // Extract complex expression for dependency
-    const finalAmount = (finalAmountData as any)?.data?.finalAmount;
-
-    // Debug logging (only when order or countdown changes)
-    useEffect(() => {
-        console.log('🔍 ActiveStorageCard Data Debug:');
-        console.log('📦 Order Object:', JSON.stringify(order, null, 2));
-        console.log('🏢 Storage Info:', {
-            id: order.storage?.id || order.storageId,
-            title: order.storage?.title,
-            description: order.storage?.description,
-            address: order.storage?.address,
-            storageIdFromOrder: order.storageId
-        });
-        console.log('📋 Package Info:', {
-            description: order.packageDescription,
-            startTime: order.startKeepTime || 'No startKeepTime in order',
-            estimatedDays: order.estimatedDays || 'No estimatedDays in order',
-            totalAmount: order.totalAmount,
-            serverStartTime: serverCountdown?.startKeepTime || 'No server startKeepTime',
-            serverEstimatedDays: serverCountdown?.estimatedDays || 'No server estimatedDays'
-        });
-        console.log('📅 Date Formatting Test:', {
-            raw: order.startKeepTime,
-            serverRaw: serverCountdown?.startKeepTime,
-            usingServerData: !!serverCountdown,
-            finalStartTime: startKeepTime,
-            formatted: startKeepTime ? 
-                new Date(startKeepTime).toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: '2-digit', 
-                    year: 'numeric'
-                }) : 
-                'Not started yet'
-        });
-
-        console.log('⏰ Server Countdown Data:', {
-            serverCountdown,
-            localCountdown,
-            localStartKeepTime: startKeepTime,
-            estimatedDays,
-            finalCountdown: countdown,
-            isExpired: countdown?.isExpired,
-            countdownType: countdown ? ('formattedTimeRemaining' in countdown ? 'server' : 'local') : 'null',
-            loading
-        });
-
-        console.log('💰 Final Amount Data:', finalAmountData);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [order.id, serverCountdown?.startKeepTime, finalAmount]); // Only log when these key values change
-
-    // Schedule notifications when order becomes active (Disabled for Expo Go)
-    useEffect(() => {
-        // if (order.id && order.startKeepTime && order.estimatedDays && !countdown.isExpired) {
-        //     scheduleOrderNotifications(order);
-        // }
-        console.log('Notifications disabled for Expo Go compatibility');
-    }, [order, countdown.isExpired]);
-
-    // Handle app state changes for accurate countdown
-    useEffect(() => {
-        const handleAppStateChange = (nextAppState: any) => {
-            if (appState.match(/inactive|background/) && nextAppState === 'active') {
-                // App just came to foreground - countdown tự động cập nhật
-                console.log('App returned to foreground, countdown will auto-update');
-            }
-            setAppState(nextAppState);
-        };
-
-        const subscription = AppState.addEventListener('change', handleAppStateChange);
-        return () => subscription?.remove();
-    }, [appState]);
-
-
-    return (
-        <TouchableOpacity 
-            onPress={() => router.replace({
-                pathname: '/(root)/orderdetails/[id]',
-                params: { id: order.id }
-            })}
-            className="bg-surface rounded-3xl p-0 mb-3 shadow-lg border border-border"
-            style={{
-                shadowColor: palette.shadow,
-                shadowOpacity: 0.12,
-                shadowRadius: 16,
-                shadowOffset: { width: 0, height: 8 },
-                elevation: 8,
-                borderWidth: 1,
-                borderColor: palette.border
-            }}
-            activeOpacity={0.96}
-        >
-            {/* Top Section - Storage Header */}
-            <View className="bg-primary-soft px-5 py-4 rounded-t-3xl border-b border-border">
-                <View className="flex-row items-center justify-between">
-                    <View className="flex-row items-center flex-1">
-                        <View className="bg-primary rounded-xl p-2.5 mr-3">
-                            <Ionicons name="archive" size={18} color="white" />
-                        </View>
-                        <View className="flex-1">
-                            <Text className="text-text text-base font-bold mb-0.5" numberOfLines={1}>
-                                {order.storage?.title || order.storage?.description || 'Storage Location'}
-                            </Text>
-                            <Text className="text-text-secondary text-sm font-medium" numberOfLines={2}>
-                                Items: {order.packageDescription || 'Package stored'}
-                            </Text>
-                        </View>
-                    </View>
-                    <View className="bg-surface rounded-lg px-2 py-1">
-                        <Text className="text-success text-xs font-bold uppercase">
-                            ACTIVE
-                        </Text>
-                    </View>
-                </View>
-            </View>
-
-            {/* Middle Section - Countdown */}
-            <View className="px-5 py-6 items-center">
-                <Text className="text-text-secondary text-xs font-semibold uppercase tracking-wider mb-4">
-                    STORAGE COUNTDOWN
-                </Text>
-                <CountdownDisplay countdown={countdown} />
-                <Text className="text-text-secondary text-xs mt-4 text-center">
-                    Started: {countdown?.startKeepTime ? 
-                        new Date(countdown.startKeepTime).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: '2-digit', 
-                            year: 'numeric'
-                        }) : 
-                        order.startKeepTime ? 
-                        new Date(order.startKeepTime).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: '2-digit', 
-                            year: 'numeric'
-                        }) : 
-                        'Not started yet'
-                    }
-                </Text>
-            </View>
-
-            {/* Bottom Section - Cost & Action */}
-            <View className="bg-surfaceVariant px-5 py-4 rounded-b-3xl flex-row items-center justify-between">
-                <View>
-                    <Text className="text-text-secondary text-xs font-semibold uppercase mb-1">
-                        TOTAL COST
-                    </Text>
-                    <Text className="text-text font-extrabold text-lg">
-                        {(finalAmountData as any)?.data?.finalAmount ? 
-                            `${(finalAmountData as any).data.finalAmount.toLocaleString()}` : 
-                            `${(order.totalAmount || 0).toLocaleString()}`
-                        } <Text className="text-xs text-text-secondary">VND</Text>
-                    </Text>
-                </View>
-                <View className="bg-primary rounded-2xl px-4 py-2.5 flex-row items-center shadow-lg"
-                    style={{
-                        shadowColor: palette.primary,
-                        shadowOpacity: 0.4,
-                        shadowRadius: 8,
-                        shadowOffset: { width: 0, height: 4 },
-                        elevation: 6
-                    }}
-                >
-                    <Ionicons name="chevron-forward" size={14} color="white" />
-                    <Text className="text-white font-bold text-xs ml-1">
-                        VIEW
-                    </Text>
-                </View>
-            </View>
-        </TouchableOpacity>
-    );
-});
-
-ActiveStorageCard.displayName = 'ActiveStorageCard';
 
 export default Home

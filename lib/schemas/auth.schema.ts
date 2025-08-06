@@ -2,49 +2,58 @@ import { z } from 'zod'
 
 // Sign Up Schema
 export const SignUpSchema = z.object({
-    username: z.string().min(3, 'Username must be at least 3 characters'),
-    email: z.string().email('Please enter a valid email'),
-    phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits'),
+    username: z.string().min(3, 'Tên người dùng phải có ít nhất 3 ký tự'),
+    email: z.string().email('Vui lòng nhập email hợp lệ'),
+    phoneNumber: z.string().min(10, 'Số điện thoại phải có ít nhất 10 số'),
     password: z.string()
-        .min(8, 'Password must be at least 8 characters')
-        .regex(/[A-Z]/, 'Password must contain at least 1 uppercase letter')
-        .regex(/[a-z]/, 'Password must contain at least 1 lowercase letter')
-        .regex(/\d/, 'Password must contain at least 1 number')
-        .regex(/[@#$%^&*!_]/, 'Password must contain at least 1 special character (@#$%^&*!_)'),
+        .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
+        .regex(/[A-Z]/, 'Mật khẩu phải có ít nhất 1 chữ hoa')
+        .regex(/[a-z]/, 'Mật khẩu phải có ít nhất 1 chữ thường')
+        .regex(/\d/, 'Mật khẩu phải có ít nhất 1 số')
+        .regex(/[@#$%^&*!_]/, 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt (@#$%^&*!_)'),
     confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
+    message: "Mật khẩu xác nhận không khớp",
     path: ["confirmPassword"],
 })
 
 // Sign In Schema
 export const SignInSchema = z.object({
-    email: z.string().email('Please enter a valid email'),
-    password: z.string().min(1, 'Password is required')
+    email: z.string().email('Vui lòng nhập email hợp lệ'),
+    password: z.string().min(1, 'Mật khẩu không được để trống')
 })
 
 // Change Password Schema
 export const ChangePasswordSchema = z.object({
-    currentPassword: z.string().min(1, 'Current password is required'),
-    newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+    currentPassword: z.string().min(1, 'Mật khẩu hiện tại không được để trống'),
+    newPassword: z.string().min(8, 'Mật khẩu mới phải có ít nhất 8 ký tự'),
     confirmNewPassword: z.string()
 }).refine((data) => data.newPassword === data.confirmNewPassword, {
-    message: "Passwords don't match",
+    message: "Mật khẩu xác nhận không khớp",
     path: ["confirmNewPassword"],
 })
 
 // Forgot Password Schema
 export const ForgotPasswordSchema = z.object({
-    email: z.string().email('Please enter a valid email')
+    email: z.string().email('Email không hợp lệ'),
+    password: z.string()
+        .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
+        .regex(/[A-Z]/, 'Mật khẩu phải có ít nhất 1 chữ hoa')
+        .regex(/[a-z]/, 'Mật khẩu phải có ít nhất 1 chữ thường')
+        .regex(/\d/, 'Mật khẩu phải có ít nhất 1 số'),
+    confirmPassword: z.string()
+}).refine((data) => data.password === data.confirmPassword, {
+    message: 'Mật khẩu xác nhận không khớp',
+    path: ['confirmPassword']
 })
 
 // Reset Password Schema
 export const ResetPasswordSchema = z.object({
-    token: z.string().min(1, 'Reset token is required'),
-    newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+    token: z.string().min(1, 'Mã reset không được để trống'),
+    newPassword: z.string().min(8, 'Mật khẩu mới phải có ít nhất 8 ký tự'),
     confirmPassword: z.string()
 }).refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords don't match",
+    message: "Mật khẩu xác nhận không khớp",
     path: ["confirmPassword"],
 })
 

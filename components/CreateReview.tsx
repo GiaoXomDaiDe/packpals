@@ -1,6 +1,6 @@
 import CustomButton from '@/components/CustomButton'
 import StarRating from '@/components/StarRating'
-import { fetchAPI } from '@/lib/fetch'
+import { fetchAPI } from '@/lib/services/fetch'
 import { useUserStore } from '@/store'
 import React, { useState } from 'react'
 import { Alert, Text, TextInput, TouchableOpacity, View } from 'react-native'

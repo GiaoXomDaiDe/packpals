@@ -1,16 +1,16 @@
+import { useUploadImages } from '@/hooks/query'
+import * as ImagePicker from 'expo-image-picker'
 import React, { useState } from 'react'
 import {
-    Alert,
-    Image,
-    Modal,
-    ScrollView,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  Image,
+  Modal,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native'
 import Ionicons from 'react-native-vector-icons/Ionicons'
-import * as ImagePicker from 'expo-image-picker'
-import { useUploadImages } from '@/lib/query/hooks'
 
 interface OrderCertificationModalProps {
     visible: boolean

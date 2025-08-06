@@ -4,9 +4,21 @@ import MapView, { Marker, Polyline, PROVIDER_DEFAULT, Region } from 'react-nativ
 import MapViewDirections from 'react-native-maps-directions'
 import Ionicons from 'react-native-vector-icons/Ionicons'
 
-import { calculateRegion } from '@/lib/map'
-import { StorageMarkerData } from '@/lib/types/type'
 import { useLocationStore, useStorageStore } from '@/store'
+import { calculateRegion } from '@/utils/map'
+import { StorageMarkerData } from '../types/type'
+
+/**
+ * EnhancedMap Component with GPS Drift Reduction
+ * 
+ * Current drift reduction strategies implemented:
+ * - Fixed coordinate precision (6 decimal places) to prevent micro-updates
+ * - Stable marker keys to prevent unnecessary re-renders
+ * - Optimized MapViewDirections with low precision for performance
+ * 
+ * For further drift reduction, use with useEnhancedLocation hook
+ * which implements Kalman filtering, accuracy thresholds, and teleportation detection.
+ */
 
 const directionsAPI = process.env.EXPO_PUBLIC_GOOGLE_API_KEY
 
@@ -130,19 +142,22 @@ const EnhancedMap: React.FC<EnhancedMapProps> = ({
       showsUserLocation={true}
       showsMyLocationButton={false}
       userInterfaceStyle="light"
-      onPanDrag={() => onMapDrag?.(true)}
-      onRegionChangeComplete={() => onMapDrag?.(false)}
+      // Detect ANY touch interaction - not just drag
+      onTouchStart={() => onMapDrag?.(true)}
+      onTouchEnd={() => onMapDrag?.(false)}
+      onTouchCancel={() => onMapDrag?.(false)}
       pitchEnabled={true}
       rotateEnabled={true}
       scrollEnabled={true}
       zoomEnabled={true}
     >
-      {/* User Location Marker (custom) */}
+      {/* User Location Marker (custom) - Use stable coordinates with enhanced precision */}
       {userLatitude && userLongitude && (
         <Marker
+          key="user-location" // Stable key
           coordinate={{
-            latitude: userLatitude,
-            longitude: userLongitude,
+            latitude: Number(userLatitude.toFixed(6)), // Fixed precision to prevent micro-changes
+            longitude: Number(userLongitude.toFixed(6)),
           }}
           title="Your Location"
           description="You are here"
@@ -164,16 +179,16 @@ const EnhancedMap: React.FC<EnhancedMapProps> = ({
         </Marker>
       )}
 
-      {/* Storage Markers */}
+      {/* Storage Markers - Use stable coordinates */}
       {storages.map((storage) => {
         const isSelected = selectedStorageId === storage.id
         
         return (
           <Marker
-            key={storage.id}
+            key={`storage-${storage.id}`} // Stable key
             coordinate={{
-              latitude: storage.latitude,
-              longitude: storage.longitude,
+              latitude: Number(storage.latitude.toFixed(6)), // Fixed precision
+              longitude: Number(storage.longitude.toFixed(6)),
             }}
             title={storage.title}
             description={`${storage.pricePerDay.toLocaleString()} VND/day`}

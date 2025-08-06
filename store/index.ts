@@ -1,5 +1,5 @@
-import { AuthStore, AuthUser } from '@/lib/types/auth.types'
 import { create } from 'zustand'
+import { AuthStore, User } from '../types/auth.types'
 
 import {
     CompletedOrder,
@@ -7,7 +7,7 @@ import {
     OrderStore,
     StorageMarkerData,
     StorageStore
-} from '@/lib/types/type'
+} from '../types/type'
 
 export const useLocationStore = create<LocationStore>((set) => ({
     userLatitude: null,
@@ -31,9 +31,9 @@ export const useLocationStore = create<LocationStore>((set) => ({
             userAddress: address,
         }))
 
-        const { selectedStorage, clearSelectedStorage } =
-            useStorageStore.getState()
-        if (selectedStorage) clearSelectedStorage()
+        // Don't automatically clear selected storage when user location updates
+        // This was causing issues when user is on BookStorage page
+        // Let components handle storage clearing manually when needed
     },
 
     setSelectedStorageLocation: ({
@@ -63,10 +63,15 @@ export const useLocationStore = create<LocationStore>((set) => ({
 export const useStorageStore = create<StorageStore>((set) => ({
     storages: [] as StorageMarkerData[],
     selectedStorage: null,
-    setSelectedStorage: (storageId: string) =>
-        set(() => ({ selectedStorage: storageId })),
+    setSelectedStorage: (storageId: string) => {
+        console.log('🏪 Setting selected storage:', storageId)
+        set(() => ({ selectedStorage: storageId }))
+    },
     setStorages: (storages: StorageMarkerData[]) => set(() => ({ storages })),
-    clearSelectedStorage: () => set(() => ({ selectedStorage: null })),
+    clearSelectedStorage: () => {
+        console.log('🗑️ Clearing selected storage (called from:', new Error().stack?.split('\n')[2]?.trim() || 'unknown', ')')
+        set(() => ({ selectedStorage: null }))
+    },
 }))
 
 export const useOrderStore = create<OrderStore>((set) => ({
@@ -77,13 +82,16 @@ export const useOrderStore = create<OrderStore>((set) => ({
 }))
 
 // User store for authentication and user data using the imported AuthStore interface
-export const useUserStore = create<AuthStore>((set) => ({
+export const useUserStore = create<AuthStore>((set, get) => ({
     user: null,
     isAuthenticated: false,
     token: null,
-    setUser: (user: AuthUser, token?: string) => 
+    setUser: (user: User, token?: string) => 
         set(() => ({ 
-            user, 
+            user: {
+                ...user,
+                activeRole: user.activeRole || user.role // Set activeRole to current role if not provided
+            }, 
             isAuthenticated: true,
             token: token || null
         })),
@@ -95,6 +103,32 @@ export const useUserStore = create<AuthStore>((set) => ({
         })),
     setToken: (token: string) =>
         set(() => ({ token })),
+    updateUserRole: (newRole: string) => {
+        const currentUser = get().user
+        if (currentUser) {
+            set(() => ({
+                user: {
+                    ...currentUser,
+                    role: newRole,
+                    roles: currentUser.roles?.includes(newRole) 
+                        ? currentUser.roles 
+                        : [...(currentUser.roles || [currentUser.role]), newRole],
+                    activeRole: newRole
+                }
+            }))
+        }
+    },
+    switchActiveRole: (role: string) => {
+        const currentUser = get().user
+        if (currentUser && currentUser.roles?.includes(role)) {
+            set(() => ({
+                user: {
+                    ...currentUser,
+                    activeRole: role
+                }
+            }))
+        }
+    }
 }))
 
 // Global reset function to clear all storage-related state

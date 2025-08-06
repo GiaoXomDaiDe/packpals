@@ -1,18 +1,11 @@
-import EnhancedMap from '@/components/EnhancedMap'
-import { StorageDisplayCard } from '@/components/StorageDisplayCard'
-import { useStorageDistance } from '@/lib/hooks/useStorageDistance'
-import { AvailableStatus, useStorageList } from '@/lib/query/hooks'
-import { StorageApiData, StorageMarkerData } from '@/lib/types/type'
-import { filterStoragesByRadius } from '@/lib/utils/distance'
-import { useLocationStore, useStorageStore } from '@/store'
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet'
-import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     ActivityIndicator,
     Alert,
     Image,
+    Keyboard,
     RefreshControl,
     Text,
     TextInput,
@@ -24,204 +17,207 @@ import Animated, {
     FadeInDown,
     useAnimatedStyle,
     useSharedValue,
-    withTiming,
 } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from 'react-native-vector-icons/Ionicons'
 
+import EnhancedMap from '@/components/EnhancedMap'
+import { StorageDisplayCard } from '@/components/StorageDisplayCard'
+import { AvailableStatus, useDistance, useStorageAll } from '@/hooks/query'
+import { useRefresh } from '@/hooks/useRefresh'
+import { useLocationStore, useStorageStore } from '@/store'
+import { filterStoragesByRadiusSync } from '@/utils'
+import { StorageApiData, StorageMarkerData } from '../../types/type'
+
+// Constants
+const SEARCH_RADIUS_OPTIONS = [5, 10, 50]
+const SNAP_POINTS = ['40%', '45%']
+const DEFAULT_STORAGE_IMAGE = 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400'
+const DEFAULT_AMENITIES = ['Security Camera', 'Climate Control', '24/7 Access']
+
+type StorageWithDistance = StorageMarkerData & { distance: number }
+
 const FindStorage = () => {
     const [searchQuery, setSearchQuery] = useState('')
     const [searchRadius, setSearchRadius] = useState(10)
-    const [filteredStorages, setFilteredStorages] = useState<
-        (StorageMarkerData & { distance: number })[]>([])
-    const [selectedStorage, setSelectedStorage] = useState<
-        (StorageMarkerData & { distance: number }) | null>(null)
-    const [searchSuggestions, setSearchSuggestions] = useState<
-        (StorageMarkerData & { distance: number })[]>([])
-    const [cachedStorages, setCachedStorages] = useState<
-        (StorageMarkerData & { distance: number })[]>([])
+    const [filteredStorages, setFilteredStorages] = useState<StorageWithDistance[]>([])
+    const [selectedStorage, setSelectedStorage] = useState<StorageWithDistance | null>(null)
+    const [searchSuggestions, setSearchSuggestions] = useState<StorageWithDistance[]>([])
     const [routeError, setRouteError] = useState<string | null>(null)
+    const [isMapDragging, setIsMapDragging] = useState(false)
+    
+    // Simple variables: User location from device GPS
     const { userLatitude, userLongitude, userAddress } = useLocationStore()
-    const { setSelectedStorage: setStoreSelectedStorage, setStorages } =
-        useStorageStore()
+    const userLocation = {
+        latitude: userLatitude,
+        longitude: userLongitude,
+        address: userAddress
+    }
+    
+    const { setSelectedStorage: setStoreSelectedStorage, setStorages: setStoreStorages } = useStorageStore()
 
-    // BottomSheet ref and snap points
+    // Refs
     const bottomSheetRef = useRef<BottomSheet>(null)
     const mapRef = useRef<any>(null)
-    const snapPoints = ['40%', '45%']
-
-    // Animated values for floating header
+    const hasInitialZoom = useRef(false)
+    
+    // Animated values
     const headerTranslateY = useSharedValue(0)
 
-    // Use TanStack Query for consolidated data fetching
+    // Simple API call for storages from backend
     const {
         data: storagesResponse,
         isLoading,
         isRefetching,
         refetch,
         error,
-    } = useStorageList({
+    } = useStorageAll({
         status: AvailableStatus.AVAILABLE,
         limit: 100,
     })
-    console.log(storagesResponse?.data.data, 'Storage List Response')
 
-    // Process storages data with distance filtering
-    const processedStorages = React.useMemo((): (StorageMarkerData & {
-        distance: number
-    })[] => {
-        console.log('Processing storages - API data:', !!storagesResponse?.data?.data, 'User location:', !!userLatitude && !!userLongitude)
-        
-        // Check if we have valid API response data
-        if (!storagesResponse?.data?.data) {
-            console.log('No API data available, using cached storages:', cachedStorages.length)
-            return cachedStorages
-        }
-
-        // Check if we have user location
-        if (!userLatitude || !userLongitude) {
-            console.log('No user location available, using cached storages:', cachedStorages.length)
-            return cachedStorages
+    // Simple storages processing - just convert API data to display format
+    const storages = useMemo((): StorageWithDistance[] => {        
+        // Check if we have user location and API data
+        if (!userLocation.latitude || !userLocation.longitude || !storagesResponse?.data?.data) {
+            return []
         }
 
         const apiStorages: StorageApiData[] = storagesResponse.data.data
-        console.log('Processing', apiStorages.length, 'storages from API')
         
-        const storagesWithCoords = apiStorages
+        const processedStorages = apiStorages
             .filter((storage) => storage.latitude && storage.longitude)
-            .map(
-                (storage): StorageMarkerData => ({
-                    id: storage.id,
-                    title: storage.description || 'Storage Space',
-                    address: storage.address || 'Unknown Location',
-                    latitude: storage.latitude,
-                    longitude: storage.longitude,
-                    status: storage.status || 'AVAILABLE',
-                    keeperPhoneNumber: storage.keeperPhoneNumber || 'N/A',
-                    keeperId: storage.keeperId || 'unknown',
-                    pricePerDay: 0, // Price will be calculated during booking
-                    rating: storage.averageRating || 0,
-                    keeperName: storage.keeperName || 'Storage Owner',
-                    images: [
-                        'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400',
-                    ],
-                    description:
-                        storage.description ||
-                        'Secure storage space available for rent',
-                    amenities: [
-                        'Security Camera',
-                        'Climate Control',
-                        '24/7 Access',
-                    ],
-                    totalSpaces: 10,
-                    availableSpaces: 8,
-                })
-            )
+            .map((storage): StorageMarkerData => ({
+                id: storage.id,
+                title: storage.description || 'Storage Space',
+                address: storage.address || 'Unknown Location',
+                latitude: storage.latitude,
+                longitude: storage.longitude,
+                status: storage.status || 'AVAILABLE',
+                keeperPhoneNumber: storage.keeperPhoneNumber || 'N/A',
+                keeperId: storage.keeperId || 'unknown',
+                pricePerDay: 0,
+                rating: storage.averageRating || 0,
+                keeperName: storage.keeperName || 'Storage Owner',
+                images: [DEFAULT_STORAGE_IMAGE],
+                description: storage.description || 'Secure storage space available for rent',
+                amenities: [...DEFAULT_AMENITIES],
+                totalSpaces: 10,
+                availableSpaces: 8,
+            }))
 
         // Filter by radius and add distance
-        const filtered = filterStoragesByRadius(
-            userLatitude,
-            userLongitude,
-            storagesWithCoords,
+        return filterStoragesByRadiusSync(
+            userLocation.latitude,
+            userLocation.longitude,
+            processedStorages,
             searchRadius
         )
-        
-        return filtered
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [storagesResponse, userLatitude, userLongitude, searchRadius])
+    }, [storagesResponse, userLocation.latitude, userLocation.longitude, searchRadius])
+
+    // Update global storage store whenever storages change
     useEffect(() => {
-        if (processedStorages.length > 0) {
-            setStorages(processedStorages)
-            setCachedStorages(processedStorages)
-        }
-    }, [processedStorages, setStorages])
+        console.log('🏪 Updating global storage store with', storages.length, 'storages')
+        setStoreStorages(storages)
+    }, [storages, setStoreStorages])
 
     // Filter storages based on search query
     useEffect(() => {
         if (searchQuery.trim() === '') {
-            setFilteredStorages(processedStorages)
+            setFilteredStorages(storages)
             setSearchSuggestions([])
         } else {
-            const filtered = processedStorages.filter(
+            const filtered = storages.filter(
                 (storage) =>
-                    storage.title
-                        .toLowerCase()
-                        .includes(searchQuery.toLowerCase()) ||
-                    storage.address
-                        .toLowerCase()
-                        .includes(searchQuery.toLowerCase()) ||
-                    storage.keeperName
-                        .toLowerCase()
-                        .includes(searchQuery.toLowerCase())
+                    storage.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    storage.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    storage.keeperName.toLowerCase().includes(searchQuery.toLowerCase())
             )
             setFilteredStorages(filtered)
             setSearchSuggestions(filtered.slice(0, 5)) // Top 5 suggestions
         }
-    }, [processedStorages, searchQuery])
+    }, [storages, searchQuery])
 
-    // Use storage distance API for selected storage
-    const { result: distanceResult, isLoading: isDistanceLoading } = useStorageDistance(
-        selectedStorage && userLatitude && userLongitude
+    // Initial zoom to user location only once - improved logic
+    useEffect(() => {
+        if (userLocation.latitude && userLocation.longitude && !hasInitialZoom.current) {
+            console.log('🎯 Initial zoom triggered:', userLocation.latitude, userLocation.longitude)
+            
+            // Shorter delay and ensure map is ready
+            const timer = setTimeout(() => {
+                if (mapRef.current) {
+                    console.log('🗺️ Animating to user location')
+                    mapRef.current.animateToRegion({
+                        latitude: userLocation.latitude,
+                        longitude: userLocation.longitude,
+                        latitudeDelta: 0.015,
+                        longitudeDelta: 0.015,
+                    }, 1000)
+                    hasInitialZoom.current = true
+                }
+            }, 500) // Reduced delay
+            
+            return () => clearTimeout(timer)
+        }
+    }, [userLocation.latitude, userLocation.longitude])
+
+    // Use distance API for selected storage
+    const { 
+        data: distanceData, 
+        isLoading: isDistanceLoading,
+        error: distanceError 
+    } = useDistance(
+        selectedStorage && userLocation.latitude && userLocation.longitude
             ? {
-                userLatitude,
-                userLongitude,
-                storageLatitude: selectedStorage.latitude,
-                storageLongitude: selectedStorage.longitude,
+                lat1: userLocation.latitude,
+                lon1: userLocation.longitude,
+                lat2: selectedStorage.latitude,
+                lon2: selectedStorage.longitude,
             }
-            : null,
-        !!selectedStorage && !!userLatitude && !!userLongitude
+            : { lat1: 0, lon1: 0, lat2: 0, lon2: 0 },
+        {
+            enabled: !!(selectedStorage && userLocation.latitude && userLocation.longitude)
+        }
     )
 
     // Update route info when distance result changes
     useEffect(() => {
-        console.log('🔄 Distance result changed:', {
-            distanceResult,
+        console.log('🔄 Distance data changed:', {
+            distanceData,
             isDistanceLoading,
+            distanceError
         })
         
-        if (distanceResult) {
-            if (distanceResult.error) {
-                console.log('❌ Distance calculation error:', distanceResult.error)
-                setRouteError(distanceResult.error)
-            } else if (distanceResult.distance) {
-                // ✅ Distance calculated successfully  
-                console.log('✅ Distance calculated:', distanceResult.distance.toFixed(1), 'km')
-                setRouteError(null)
-            }
+        if (distanceData) {
+            console.log('✅ Distance calculated:', distanceData.data, 'km')
+            setRouteError(null)
+        } else if (distanceError) {
+            console.log('❌ Distance calculation error:', distanceError)
+            setRouteError(distanceError.message || 'Failed to calculate distance')
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [distanceResult])
+    }, [distanceData, isDistanceLoading, distanceError])
 
-    // Handle storage marker/card press (unified interaction) - Option 3: Immediate feedback
-    const handleStoragePress = (
-        storage: StorageMarkerData & { distance?: number }
-    ) => {
-        // ✅ IMMEDIATE HAPTIC FEEDBACK for better user experience
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-        
+    // Handle storage marker/card press
+    const handleStoragePress = useCallback((storage: StorageMarkerData & { distance?: number }) => {
         if (typeof storage.distance === 'number') {
-            setSelectedStorage(
-                storage as StorageMarkerData & { distance: number }
-            )
+            setSelectedStorage(storage as StorageWithDistance)
         }
         
-        // ✅ IMMEDIATE FEEDBACK: Clear any previous errors
+        // Clear any previous errors
         setRouteError(null)
         
-        // ✅ IMMEDIATE MAP ANIMATION: Fit coordinates without waiting for route calculation
-        if (mapRef.current && userLatitude && userLongitude) {
+        // Immediate map animation
+        if (mapRef.current && userLocation.latitude && userLocation.longitude) {
             const coordinates = [
-                { latitude: userLatitude, longitude: userLongitude },
+                { latitude: userLocation.latitude, longitude: userLocation.longitude },
                 { latitude: storage.latitude, longitude: storage.longitude },
             ]
             
-            // Animate map immediately for instant visual feedback
             mapRef.current.fitToCoordinates(coordinates, {
                 edgePadding: { top: 50, right: 50, bottom: 300, left: 50 },
                 animated: true,
             })
             
-            // Also zoom to the selected storage for better focus
             setTimeout(() => {
                 mapRef.current?.animateToRegion({
                     latitude: storage.latitude,
@@ -229,27 +225,43 @@ const FindStorage = () => {
                     latitudeDelta: 0.01,
                     longitudeDelta: 0.01,
                 }, 1000)
-            }, 500) // Small delay to let fitToCoordinates finish first
+            }, 500)
         }
-    }
+    }, [userLocation.latitude, userLocation.longitude])
 
     // Handle book storage navigation
-    const handleBookStorage = (
-        storage: StorageMarkerData & { distance: number }
-    ) => {
-        setStoreSelectedStorage(storage.id)
-
-        // Store selected storage location
-        if (useLocationStore.getState().setSelectedStorageLocation) {
-            useLocationStore.getState().setSelectedStorageLocation({
-                latitude: storage.latitude,
-                longitude: storage.longitude,
-                address: storage.address,
-            })
+    const handleBookStorage = useCallback((storage: StorageWithDistance) => {
+        console.log('🚀 Booking storage:', storage.id)
+        
+        // Ensure the storage exists
+        const storageExists = storages.find(s => s.id === storage.id)
+        if (!storageExists) {
+            Alert.alert('Error', 'Selected storage is not available. Please try again.')
+            return
         }
-
+        
+        // Set the selected storage ID
+        setStoreSelectedStorage(storage.id)
         router.push('/(root)/book-storage')
-    }
+    }, [setStoreSelectedStorage, storages])
+
+    // Handle map touch behavior - Only hide bottom sheet, keep header visible
+    const handleMapDrag = useCallback((isTouching: boolean) => {
+        setIsMapDragging(isTouching)
+        
+        if (isTouching) {
+            // Only hide bottom sheet, keep header visible
+            bottomSheetRef.current?.close()
+        } else {
+            // Restore bottom sheet when touch ends
+            bottomSheetRef.current?.snapToIndex(0)
+        }
+    }, [])
+
+    // Handle bottom sheet change with useCallback
+    const handleSheetChanges = useCallback((index: number) => {
+        console.log('Bottom sheet index:', index)
+    }, [])
 
     // Handle error display with consistent error handling
     useEffect(() => {
@@ -265,29 +277,77 @@ const FindStorage = () => {
         }
     }, [error, refetch])
 
-    const onRefresh = () => {
-        refetch()
-    }
+    // Use refresh hook with haptic feedback
+    const { isRefreshing: isManualRefreshing, triggerRefresh } = useRefresh({
+        onRefresh: async () => {
+            await refetch()
+        },
+        enableHaptics: true,
+        showSuccessFeedback: true
+    })
 
-    // Handle map drag behavior - slide header and hide bottom sheet
-    const handleMapDrag = (isDragging: boolean) => {
-        if (isDragging) {
-            // Slide header up when dragging map
-            headerTranslateY.value = withTiming(-200, { duration: 300 })
-            // Collapse bottom sheet when dragging
-            bottomSheetRef.current?.close()
-        } else {
-            // Slide header back to original position
-            headerTranslateY.value = withTiming(0, { duration: 300 })
-            // Restore bottom sheet to default position
-            bottomSheetRef.current?.snapToIndex(0)
+    // Handle suggestion selection without excessive haptic feedback
+    const handleSuggestionSelect = useCallback((suggestion: StorageWithDistance) => {
+        console.log('Selected suggestion:', suggestion)
+        
+        // Dismiss keyboard first
+        Keyboard.dismiss()
+        
+        // Set selected storage and clear errors
+        setSelectedStorage(suggestion)
+        setRouteError(null)
+        setSearchQuery('')
+        setSearchSuggestions([])
+        
+        // Animate to storage location
+        if (mapRef.current) {
+            mapRef.current.animateToRegion({
+                latitude: suggestion.latitude,
+                longitude: suggestion.longitude,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+            }, 1000)
         }
-    }
+        
+        // Call handleStoragePress for full functionality
+        handleStoragePress(suggestion)
+    }, [handleStoragePress])
 
-    // Handle bottom sheet change
-    const handleSheetChanges = (index: number) => {
-        console.log('Bottom sheet index:', index)
-    }
+    // Handle clear search with useCallback
+    const handleClearSearch = useCallback(() => {
+        setSearchQuery('')
+    }, [])
+
+    // Handle storage card press with useCallback
+    const handleStorageCardPress = useCallback((storageData: any) => {
+        console.log('🖱️ Storage card pressed:', {
+            id: storageData.id,
+            title: storageData.title,
+            hasDistance: !!storageData.distance
+        })
+        
+        // Convert StorageData back to StorageMarkerData for handleStoragePress
+        const markerData: StorageWithDistance = {
+            id: storageData.id,
+            title: storageData.title || 'Storage Space',
+            address: storageData.address,
+            latitude: storageData.latitude || 0,
+            longitude: storageData.longitude || 0,
+            status: storageData.status || 'AVAILABLE',
+            keeperPhoneNumber: storageData.keeperPhoneNumber || 'N/A',
+            keeperId: storageData.keeperId || 'unknown',
+            pricePerDay: storageData.pricePerDay || 0,
+            rating: storageData.rating || 0,
+            keeperName: storageData.keeperName || 'Storage Owner',
+            images: storageData.images || [DEFAULT_STORAGE_IMAGE],
+            description: storageData.description || 'Secure storage space available for rent',
+            distance: storageData.distance || 0,
+        };
+        
+        // Only call handleStoragePress to show storage details
+        // Do NOT automatically navigate - let user click "Book This Storage" button
+        handleStoragePress(markerData);
+    }, [handleStoragePress])
 
     const headerAnimatedStyle = useAnimatedStyle(() => {
         return {
@@ -314,35 +374,41 @@ const FindStorage = () => {
                 {/* Map Container */}
                 <View className="flex-1">
                     <EnhancedMap
-                        userLatitude={userLatitude}
-                        userLongitude={userLongitude}
-                        storages={processedStorages}
+                        userLatitude={userLocation.latitude}
+                        userLongitude={userLocation.longitude}
+                        storages={storages}
                         selectedStorageId={selectedStorage?.id}
                         onStorageMarkerPress={handleStoragePress as any}
                         onMapDrag={handleMapDrag}
                         showDirections={
                             !!selectedStorage &&
-                            !!userLatitude &&
-                            !!userLongitude
+                            !!userLocation.latitude &&
+                            !!userLocation.longitude
                         }
-                        zoomToUserLocation={true}
+                        zoomToUserLocation={false}
                         showPolyline={false}
                         travelMode="DRIVING"
                     />
 
                     {/* Floating Header - Compact Design */}
                     <View className="absolute top-0 left-0 right-0 z-10 pt-3">
-                        <Animated.View
-                            entering={FadeInDown.delay(100).springify()}
-                            style={[headerAnimatedStyle]}
-                        >
-                            <View className="mx-3">
-                                {/* Header Bar - More Compact */}
-                                <View className="bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-lg mb-2">
+                        {/* Wrapper for layout animation */}
+                        <Animated.View entering={FadeInDown.delay(100).springify()}>
+                            {/* Inner view for transform animation */}
+                            <Animated.View style={[headerAnimatedStyle]}>
+                                <View className="mx-3">
+                                    {/* Header Bar - More Compact */}
+                                    <View className="bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-lg mb-2">
                                     {/* Top Row: Back button, Location, Refresh */}
                                     <View className="flex-row items-center justify-between mb-3">
                                         <TouchableOpacity
-                                            onPress={() => router.back()}
+                                            onPress={() => {
+                                                if (router.canGoBack()) {
+                                                    router.back()
+                                                } else {
+                                                    router.replace('/(root)/(tabs)/home')
+                                                }
+                                            }}
                                             className="bg-gray-100 rounded-xl p-2"
                                             activeOpacity={0.8}
                                         >
@@ -355,7 +421,7 @@ const FindStorage = () => {
 
                                         {/* Current Location as Main Title */}
                                         <View className="flex-1 mx-3 items-center">
-                                            {userAddress ? (
+                                            {userLocation.address ? (
                                                 <View className="flex-row items-center">
                                                     <View className="bg-blue-100 rounded-lg p-1.5 mr-2">
                                                         <Ionicons
@@ -372,7 +438,7 @@ const FindStorage = () => {
                                                             className="text-blue-700 text-xs text-center"
                                                             numberOfLines={1}
                                                         >
-                                                            {userAddress}
+                                                            {userLocation.address}
                                                         </Text>
                                                     </View>
                                                 </View>
@@ -389,23 +455,6 @@ const FindStorage = () => {
                                                 </View>
                                             )}
                                         </View>
-
-                                        <TouchableOpacity
-                                            onPress={onRefresh}
-                                            className="bg-gray-100 rounded-xl p-2"
-                                            disabled={isRefetching}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Ionicons
-                                                name={
-                                                    isRefetching
-                                                        ? 'hourglass'
-                                                        : 'refresh'
-                                                }
-                                                size={18}
-                                                color="#374151"
-                                            />
-                                        </TouchableOpacity>
                                     </View>
 
                                     {/* Search Bar - Thinner */}
@@ -426,9 +475,7 @@ const FindStorage = () => {
                                         />
                                         {searchQuery.length > 0 && (
                                             <TouchableOpacity
-                                                onPress={() =>
-                                                    setSearchQuery('')
-                                                }
+                                                onPress={handleClearSearch}
                                                 activeOpacity={0.7}
                                             >
                                                 <Ionicons
@@ -444,7 +491,7 @@ const FindStorage = () => {
                                     <View className="flex-row items-center justify-between mt-3">
                                         <Text className="text-gray-700 font-JakartaMedium text-sm">Range:</Text>
                                         <View className="flex-row bg-gray-100 rounded-lg p-1">
-                                            {[5, 10, 50].map((range) => (
+                                            {SEARCH_RADIUS_OPTIONS.map((range) => (
                                                 <TouchableOpacity
                                                     key={range}
                                                     onPress={() => setSearchRadius(range)}
@@ -471,11 +518,13 @@ const FindStorage = () => {
                                 </View>
                             </View>
                         </Animated.View>
+                        </Animated.View>
                         
                         {/* Search Suggestions Dropdown - Positioned Below Header */}
-                        {searchQuery.length > 0 && searchSuggestions.length > 0 && (
+                        {searchQuery.length > 0 && searchSuggestions.length > 0 && !isMapDragging && (
                             <View className="mx-3 mt-2">
-                                <View
+                                <Animated.View
+                                    entering={FadeInDown.delay(50).springify()}
                                     style={{
                                         backgroundColor: '#fff',
                                         borderRadius: 12,
@@ -494,30 +543,7 @@ const FindStorage = () => {
                                     {searchSuggestions.map((suggestion) => (
                                         <TouchableOpacity
                                             key={suggestion.id}
-                                            onPress={() => {
-                                                console.log('Selected suggestion:', suggestion)
-                                                // ✅ HAPTIC FEEDBACK for selection
-                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-                                                
-                                                // ✅ IMMEDIATE FEEDBACK: Set selected storage and clear errors
-                                                setSelectedStorage(suggestion)
-                                                setRouteError(null)
-                                                setSearchQuery('')
-                                                setSearchSuggestions([])
-                                                
-                                                // ✅ IMMEDIATE MAP FOCUS: Animate to storage location right away
-                                                if (mapRef.current) {
-                                                    mapRef.current.animateToRegion({
-                                                        latitude: suggestion.latitude,
-                                                        longitude: suggestion.longitude,
-                                                        latitudeDelta: 0.005,
-                                                        longitudeDelta: 0.005,
-                                                    }, 1000)
-                                                }
-                                                
-                                                // Call handleStoragePress for full functionality
-                                                handleStoragePress(suggestion)
-                                            }}
+                                            onPress={() => handleSuggestionSelect(suggestion)}
                                             className="px-4 py-3 border-b border-gray-100 last:border-b-0"
                                             activeOpacity={0.7}
                                         >
@@ -537,7 +563,7 @@ const FindStorage = () => {
                                             </View>
                                         </TouchableOpacity>
                                     ))}
-                                </View>
+                                </Animated.View>
                             </View>
                         )}
                     </View>
@@ -546,7 +572,7 @@ const FindStorage = () => {
                 {/* BottomSheet for Storage List */}
                 <BottomSheet
                     ref={bottomSheetRef}
-                    snapPoints={snapPoints}
+                    snapPoints={SNAP_POINTS}
                     onChange={handleSheetChanges}
                     index={0}
                     backgroundStyle={{
@@ -560,14 +586,28 @@ const FindStorage = () => {
                         height: 4,
                     }}
                     enablePanDownToClose={false}
+                    animateOnMount={true}
+                    animationConfigs={{
+                        duration: 300,
+                    }}
+                    style={{
+                        shadowColor: '#000',
+                        shadowOffset: {
+                            width: 0,
+                            height: -2,
+                        },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 8,
+                        elevation: 8,
+                    }}
                 >
                     <BottomSheetScrollView
                         style={{ flex: 1, paddingHorizontal: 20 }}
                         showsVerticalScrollIndicator={false}
                         refreshControl={
                             <RefreshControl
-                                refreshing={isRefetching}
-                                onRefresh={onRefresh}
+                                refreshing={isRefetching || isManualRefreshing}
+                                onRefresh={triggerRefresh}
                                 colors={['#007AFF']}
                             />
                         }
@@ -590,9 +630,7 @@ const FindStorage = () => {
                                             </Text>
                                             <Text className="text-sm text-gray-500">
                                                 It is{' '}
-                                                {selectedStorage?.distance?.toFixed(
-                                                    1
-                                                ) || '0.0'}{' '}
+                                                {distanceData?.data?.toFixed(1) || selectedStorage?.distance?.toFixed(1) || '0.0'}{' '}
                                                 km from you
                                             </Text>
                                         </View>
@@ -614,10 +652,7 @@ const FindStorage = () => {
                                     <View className="relative">
                                         <Image
                                             source={{
-                                                uri:
-                                                    selectedStorage
-                                                        ?.images?.[0] ||
-                                                    'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400',
+                                                uri: selectedStorage?.images?.[0] || DEFAULT_STORAGE_IMAGE,
                                             }}
                                             className="w-full h-32"
                                             resizeMode="cover"
@@ -655,7 +690,7 @@ const FindStorage = () => {
                                                         />
                                                     </View>
                                                     <Text className="text-blue-600 font-JakartaMedium text-sm">
-                                                        {selectedStorage?.distance?.toFixed(1) || '0.0'} km away
+                                                        {distanceData?.data?.toFixed(1) || selectedStorage?.distance?.toFixed(1) || '0.0'} km away
                                                     </Text>
                                                 </View>
                                             </View>
@@ -741,7 +776,7 @@ const FindStorage = () => {
                                         selectedStorage &&
                                         handleBookStorage(selectedStorage)
                                     }
-                                    className="bg-blue-600 rounded-xl p-4 mb-4"
+                                    className="bg-blue-600 rounded-xl p-4 mb-8"
                                     activeOpacity={0.8}
                                 >
                                     <Text className="text-white font-JakartaBold text-center text-lg">
@@ -785,26 +820,7 @@ const FindStorage = () => {
                                                             title: storage.title,
                                                             description: storage.description,
                                                         }}
-                                                        onPress={(storageData) => {
-                                                            // Convert StorageData back to StorageMarkerData for handleStoragePress
-                                                            const markerData: StorageMarkerData & { distance: number } = {
-                                                                id: storageData.id,
-                                                                title: storageData.title || 'Storage Space',
-                                                                address: storageData.address,
-                                                                latitude: storageData.latitude || 0,
-                                                                longitude: storageData.longitude || 0,
-                                                                status: storageData.status || 'AVAILABLE',
-                                                                keeperPhoneNumber: storageData.keeperPhoneNumber || 'N/A',
-                                                                keeperId: storageData.keeperId || 'unknown',
-                                                                pricePerDay: storageData.pricePerDay || 0,
-                                                                rating: storageData.rating || 0,
-                                                                keeperName: storageData.keeperName || 'Storage Owner',
-                                                                images: storageData.images || ['https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400'],
-                                                                description: storageData.description || 'Secure storage space available for rent',
-                                                                distance: storageData.distance || 0,
-                                                            };
-                                                            handleStoragePress(markerData);
-                                                        }}
+                                                        onPress={handleStorageCardPress}
                                                         variant="grid"
                                                         width="48%"
                                                     />
@@ -832,9 +848,7 @@ const FindStorage = () => {
                                         </Text>
                                         {searchQuery && (
                                             <TouchableOpacity
-                                                onPress={() =>
-                                                    setSearchQuery('')
-                                                }
+                                                onPress={handleClearSearch}
                                                 className="bg-blue-100 rounded-xl px-4 py-2 mt-4"
                                             >
                                                 <Text className="text-blue-600 font-JakartaMedium text-sm">

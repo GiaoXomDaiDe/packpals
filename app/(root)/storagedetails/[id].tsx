@@ -2,23 +2,23 @@ import { ConfirmationModal } from '@/components/ConfirmationModal'
 import { OrderCertificationModal } from '@/components/OrderCertificationModal'
 import { icons } from '@/constants'
 import {
-    useSetOrderStartTime,
-    useStorage,
-    useStorageOrders,
-    useUpdateOrderStatus
-} from '@/lib/query/hooks'
+  useSetOrderStartTime,
+  useStorage,
+  useStorageOrders,
+  useUpdateOrderStatus
+} from '@/hooks/query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    RefreshControl,
-    ScrollView,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from 'react-native-vector-icons/Ionicons'

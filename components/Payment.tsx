@@ -7,7 +7,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons'
 import { WebView } from 'react-native-webview'
 
 import CustomButton from '@/components/CustomButton'
-import { orderAPI, paymentAPI } from '@/lib/api'
+import { orderAPI, paymentAPI } from '@/hooks/api'
 import { useLocationStore, useOrderStore, useUserStore } from '@/store'
 import { PaymentProps } from '@/types/type'
 
@@ -239,7 +239,8 @@ const Payment = ({
                                 Payment Amount:
                             </Text>
                             <Text className="text-gray-900 font-JakartaBold text-lg">
-                                {(parseFloat(amount) * 23000).toLocaleString()} VND
+                                {Math.ceil((parseFloat(amount) * 23000) / 1000) * 1000 ? 
+                                    (Math.ceil((parseFloat(amount) * 23000) / 1000) * 1000).toLocaleString() : '0'} VND
                             </Text>
                         </View>
                         <Text className="text-gray-500 text-xs mt-1">
@@ -321,7 +322,8 @@ const Payment = ({
                                 Amount Paid:
                             </Text>
                             <Text className="text-gray-900 font-JakartaBold text-sm">
-                                {(parseFloat(amount) * 23000).toLocaleString()} VND
+                                {Math.ceil((parseFloat(amount) * 23000) / 1000) * 1000 ? 
+                                    (Math.ceil((parseFloat(amount) * 23000) / 1000) * 1000).toLocaleString() : '0'} VND
                             </Text>
                         </View>
                         <View className="flex-row items-center justify-between">

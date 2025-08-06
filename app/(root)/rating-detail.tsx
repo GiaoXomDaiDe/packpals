@@ -2,7 +2,6 @@ import { router, useLocalSearchParams } from 'expo-router'
 import React, { useState } from 'react'
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     Text,
     TouchableOpacity,
@@ -11,9 +10,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from 'react-native-vector-icons/Ionicons'
 
+import { ConfirmationModal } from '@/components/ConfirmationModal'
+import CustomModal from '@/components/CustomModal'
+import DetailHeader from '@/components/DetailHeader'
 import StarRating from '@/components/StarRating'
-import { useStorage } from '@/lib/query/hooks'
-import { useDeleteRating, useRating } from '@/lib/query/hooks/useRatingQueries'
+import { useDeleteRating, useRating, useStorage } from '@/hooks/query'
 import { useUserStore } from '@/store'
 
 const RatingDetailScreen: React.FC = () => {
@@ -21,6 +22,12 @@ const RatingDetailScreen: React.FC = () => {
     const ratingId = params.ratingId as string
     const { user } = useUserStore()
     const [isDeleting, setIsDeleting] = useState(false)
+    
+    // Modal states
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [showSuccessModal, setShowSuccessModal] = useState(false)
+    const [showErrorModal, setShowErrorModal] = useState(false)
+    const [errorMessage, setErrorMessage] = useState('')
 
     console.log('📋 Rating Detail page loaded with ID:', ratingId)
 
@@ -46,23 +53,18 @@ const RatingDetailScreen: React.FC = () => {
 
     const storageData = (storageResponse as any)?.data
 
-    // Delete rating mutation
+    // Delete rating mutation with enhanced error handling
     const deleteRatingMutation = useDeleteRating({
         onSuccess: () => {
-            Alert.alert(
-                'Thành công!',
-                'Đánh giá đã được xóa thành công.',
-                [
-                    {
-                        text: 'Về Reviews',
-                        onPress: () => router.push('/(root)/(tabs)/reviews'),
-                    },
-                ]
-            )
+            console.log('✅ Rating deleted successfully');
+            setIsDeleting(false);
+            setShowSuccessModal(true);
         },
         onError: (error) => {
-            setIsDeleting(false)
-            Alert.alert('Lỗi', error.message)
+            console.error('❌ Delete rating error:', error);
+            setIsDeleting(false);
+            setErrorMessage(error?.message || 'Failed to delete rating. Please try again.');
+            setShowErrorModal(true);
         },
     })
 
@@ -94,6 +96,8 @@ const RatingDetailScreen: React.FC = () => {
 
         if (!rating) {
             console.error('❌ Cannot edit: No rating data');
+            setErrorMessage('Rating data not found. Please try again.');
+            setShowErrorModal(true);
             return;
         }
 
@@ -105,53 +109,60 @@ const RatingDetailScreen: React.FC = () => {
             existingRating: 'JSON string provided',
         });
 
-        router.push({
-            pathname: '/(root)/rating-form',
-            params: {
-                orderId: 'unknown', // We don't have order ID in rating detail
-                storageId: rating.storageId,
-                storageAddress: storageData?.address || '',
-                renterId: rating.renterId,
-                existingRating: JSON.stringify(rating),
-            },
-        })
+        try {
+            router.push({
+                pathname: '/(root)/rating-form',
+                params: {
+                    orderId: 'unknown', // We don't have order ID in rating detail
+                    storageId: rating.storageId,
+                    storageAddress: storageData?.address || '',
+                    renterId: rating.renterId,
+                    existingRating: JSON.stringify(rating),
+                    isEdit: 'true', // Flag to indicate this is an edit operation
+                },
+            });
+        } catch (error) {
+            console.error('❌ Navigation error:', error);
+            setErrorMessage('Failed to navigate to edit form. Please try again.');
+            setShowErrorModal(true);
+        }
     }
 
-    // Handle rating delete
+    // Handle rating delete with better error handling
     const handleDeleteRating = () => {
-        if (!rating || !userId) return
+        if (!rating || !userId) {
+            setErrorMessage('Missing required data for delete operation.');
+            setShowErrorModal(true);
+            return;
+        }
 
-        Alert.alert(
-            'Xác nhận xóa',
-            'Bạn có chắc chắn muốn xóa đánh giá này không? Hành động này không thể hoàn tác.',
-            [
-                {
-                    text: 'Hủy',
-                    style: 'cancel',
-                },
-                {
-                    text: 'Xóa',
-                    style: 'destructive',
-                    onPress: () => {
-                        setIsDeleting(true)
-                        deleteRatingMutation.mutate({
-                            ratingId: rating.id,
-                            renterId: userId,
-                            storageId: rating.storageId,
-                        })
-                    },
-                },
-            ]
-        )
+        setShowDeleteConfirm(true);
+    }
+
+    // Confirm delete action
+    const confirmDelete = () => {
+        setShowDeleteConfirm(false);
+        console.log('🗑️ Deleting rating:', {
+            ratingId: rating!.id,
+            renterId: userId,
+            storageId: rating!.storageId,
+        });
+        
+        setIsDeleting(true);
+        deleteRatingMutation.mutate({
+            ratingId: rating!.id,
+            renterId: userId!,
+            storageId: rating!.storageId,
+        });
     }
 
     if (loading) {
         return (
-            <SafeAreaView className="flex-1 bg-gray-50">
+            <SafeAreaView className="flex-1 bg-background">
                 <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color="#3b82f6" />
-                    <Text className="text-gray-600 mt-4 font-JakartaMedium">
-                        Loading rating details...
+                    <ActivityIndicator size="large" color="#2563eb" />
+                    <Text className="text-text-secondary mt-4 font-JakartaMedium">
+                        Loading rating information...
                     </Text>
                 </View>
             </SafeAreaView>
@@ -160,18 +171,20 @@ const RatingDetailScreen: React.FC = () => {
 
     if (hasError || !rating) {
         return (
-            <SafeAreaView className="flex-1 bg-gray-50">
+            <SafeAreaView className="flex-1 bg-background">
                 <View className="flex-1 items-center justify-center px-6">
-                    <Ionicons name="alert-circle-outline" size={80} color="#ef4444" />
-                    <Text className="text-red-500 text-xl font-JakartaBold mt-4 text-center">
-                        Failed to load rating
+                    <View className="bg-danger-soft rounded-full p-6 mb-4">
+                        <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
+                    </View>
+                    <Text className="text-danger text-xl font-JakartaBold mb-2 text-center">
+                        Unable to load rating
                     </Text>
-                    <Text className="text-gray-500 text-center mt-2">
-                        {ratingError?.message || 'The rating you\'re looking for doesn\'t exist or has been removed'}
+                    <Text className="text-text-secondary text-center mb-6">
+                        {ratingError?.message || 'The rating you are looking for does not exist or has been deleted'}
                     </Text>
                     <TouchableOpacity
                         onPress={() => router.back()}
-                        className="mt-6 bg-blue-500 rounded-2xl px-6 py-3"
+                        className="bg-primary rounded-2xl px-6 py-3"
                     >
                         <Text className="text-white font-JakartaBold">
                             Go Back
@@ -183,238 +196,204 @@ const RatingDetailScreen: React.FC = () => {
     }
 
     return (
-        <SafeAreaView className="flex-1 bg-gray-50">
-            {/* Header */}
-            <View className="bg-white px-6 py-4 border-b border-gray-100">
-                <View className="flex-row items-center justify-between">
-                    <TouchableOpacity
-                        onPress={() => router.back()}
-                        className="bg-gray-100 rounded-full p-2"
-                    >
-                        <Ionicons name="chevron-back" size={20} color="#374151" />
-                    </TouchableOpacity>
-                    
-                    <View className="items-center flex-1 mx-4">
-                        <Text className="text-lg font-JakartaBold text-gray-900">
-                            Chi tiết đánh giá
+        <SafeAreaView className="flex-1 bg-background">
+            <DetailHeader 
+                title="My Rating"
+                subtitle={`ID: ${rating.id.slice(-8)}`}
+                showBackButton={true}
+                onBackPress={() => router.back()}
+            />
+
+            <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+                {/* Compact Hero Rating Section */}
+                <View className="bg-primary px-6 py-8">
+                    <View className="items-center">
+                        <View className="bg-white/20 rounded-full p-4 mb-4">
+                            <Ionicons name="star" size={28} color="white" />
+                        </View>
+                        
+                        <Text className="text-white text-3xl font-JakartaBold mb-2">
+                            {rating.star}/5
                         </Text>
-                        <Text className="text-xs text-gray-500">
-                            #{rating.id.slice(-8)}
+                        
+                        <StarRating
+                            rating={rating.star}
+                            size="small"
+                            readonly={true}
+                            showValue={false}
+                        />
+                        
+                        <Text className="text-white/80 text-xs mt-3 font-JakartaMedium text-center">
+                            {formatRatingDate(rating.ratingDate)}
+                        </Text>
+                    </View>
+                </View>
+
+                <View className="px-4 -mt-3">
+                    {/* Compact Comment Card */}
+                    <View className="bg-surface rounded-xl p-4 mb-4 shadow-sm">
+                        <View className="flex-row items-center mb-3">
+                            <View className="bg-primary-soft rounded-full p-2 mr-2">
+                                <Ionicons name="chatbubble-outline" size={16} color="#2563eb" />
+                            </View>
+                            <Text className="text-base font-JakartaBold text-text">
+                                Comment
+                            </Text>
+                        </View>
+                        
+                        <Text className="text-text text-sm leading-5 font-JakartaRegular italic">
+                            &ldquo;{rating.comment}&rdquo;
                         </Text>
                     </View>
 
-                    <View className="flex-row">
+                    {/* Compact Storage Info Card */}
+                    {storageData && (
+                        <View className="bg-surface rounded-xl p-4 mb-4 shadow-sm">
+                            <View className="flex-row items-center mb-3">
+                                <View className="bg-accent-soft rounded-full p-2 mr-2">
+                                    <Ionicons name="business" size={16} color="#06b6d4" />
+                                </View>
+                                <Text className="text-base font-JakartaBold text-text">
+                                    Storage
+                                </Text>
+                            </View>
+                            
+                            {/* Compact Keeper Info */}
+                            <View className="flex-row items-center mb-3">
+                                <View className="bg-accent-soft rounded-full p-2 mr-2">
+                                    <Ionicons name="person" size={16} color="#06b6d4" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="text-text font-JakartaBold text-sm">
+                                        {storageData.keeperName || 'Storage Keeper'}
+                                    </Text>
+                                    <Text className="text-text-secondary text-xs">
+                                        Storage Manager
+                                    </Text>
+                                </View>
+                            </View>
+                            
+                            {/* Compact Location */}
+                            <View className="flex-row items-start mb-2">
+                                <Ionicons name="location-outline" size={14} color="#64748b" className="mt-0.5 mr-2" />
+                                <View className="flex-1">
+                                    <Text className="text-text-secondary text-xs font-JakartaBold mb-1">
+                                        Address
+                                    </Text>
+                                    <Text className="text-text text-xs">
+                                        {storageData.address || 'No address information'}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* Compact Phone */}
+                            {storageData.keeperPhoneNumber && (
+                                <View className="flex-row items-start">
+                                    <Ionicons name="call-outline" size={14} color="#64748b" className="mt-0.5 mr-2" />
+                                    <View className="flex-1">
+                                        <Text className="text-text-secondary text-xs font-JakartaBold mb-1">
+                                            Contact
+                                        </Text>
+                                        <Text className="text-text text-xs">
+                                            {storageData.keeperPhoneNumber}
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+                    )}
+
+                    {/* Compact Action Buttons */}
+                    <View className="flex-row gap-3 mb-6">
                         <TouchableOpacity
                             onPress={handleEditRating}
-                            className="bg-blue-100 rounded-full p-2 mr-2"
+                            disabled={isDeleting || deleteRatingMutation.isPending}
+                            className={`flex-1 rounded-lg py-3 px-4 flex-row items-center justify-center ${
+                                isDeleting || deleteRatingMutation.isPending 
+                                    ? 'bg-primary/50' 
+                                    : 'bg-primary'
+                            } shadow-sm`}
                         >
-                            <Ionicons name="pencil" size={18} color="#3b82f6" />
+                            <Ionicons 
+                                name="pencil-outline" 
+                                size={18} 
+                                color={isDeleting || deleteRatingMutation.isPending ? "#ffffff80" : "white"} 
+                            />
+                            <Text className={`font-JakartaBold text-sm ml-2 ${
+                                isDeleting || deleteRatingMutation.isPending 
+                                    ? 'text-white/50' 
+                                    : 'text-white'
+                            }`}>
+                                Edit
+                            </Text>
                         </TouchableOpacity>
                         
                         <TouchableOpacity
                             onPress={handleDeleteRating}
                             disabled={isDeleting || deleteRatingMutation.isPending}
-                            className="bg-red-100 rounded-full p-2"
+                            className={`flex-1 rounded-lg py-3 px-4 flex-row items-center justify-center ${
+                                isDeleting || deleteRatingMutation.isPending 
+                                    ? 'bg-red-500' 
+                                    : 'bg-red-600'
+                            } shadow-sm`}
                         >
                             {isDeleting || deleteRatingMutation.isPending ? (
-                                <ActivityIndicator size="small" color="#ef4444" />
+                                <>
+                                    <ActivityIndicator size="small" color="#ffffff" />
+                                    <Text className="text-white font-JakartaBold text-sm ml-2">
+                                        Deleting...
+                                    </Text>
+                                </>
                             ) : (
-                                <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                                <>
+                                    <Ionicons name="trash-outline" size={18} color="white" />
+                                    <Text className="text-white font-JakartaBold text-sm ml-2">
+                                        Delete
+                                    </Text>
+                                </>
                             )}
                         </TouchableOpacity>
                     </View>
                 </View>
-            </View>
-
-            <ScrollView className="flex-1 px-6" showsVerticalScrollIndicator={false}>
-                {/* Rating Summary Card */}
-                <View className="mt-6 mb-4">
-                    <View className="bg-white rounded-2xl p-6 border border-gray-100">
-                        {/* Rating Display */}
-                        <View className="items-center mb-6">
-                            <StarRating
-                                rating={rating.star}
-                                size="large"
-                                readonly={true}
-                                showValue={false}
-                            />
-                            <Text className="text-3xl font-JakartaBold text-gray-900 mt-2">
-                                {rating.star}/5
-                            </Text>
-                            <Text className="text-gray-500 text-sm mt-1">
-                                {formatRatingDate(rating.ratingDate)}
-                            </Text>
-                        </View>
-
-                        {/* Comment */}
-                        <View className="bg-gray-50 rounded-xl p-4">
-                            <Text className="text-gray-800 text-base leading-6">
-                                {rating.comment}
-                            </Text>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Storage Information */}
-                {storageData && (
-                    <View className="bg-white rounded-2xl p-6 mb-4 border border-gray-100">
-                        <View className="flex-row items-center mb-4">
-                            <Ionicons name="business-outline" size={20} color="#2563eb" />
-                            <Text className="text-base font-JakartaBold text-gray-900 ml-2">
-                                Thông tin kho lưu trữ
-                            </Text>
-                        </View>
-                        
-                        <View className="bg-blue-50 rounded-xl p-4">
-                            <View className="flex-row items-start justify-between mb-3">
-                                <View className="flex-1">
-                                    <Text className="text-blue-900 font-JakartaBold text-base">
-                                        {storageData.keeperName || 'Storage Keeper'}
-                                    </Text>
-                                    <Text className="text-blue-700 text-sm">
-                                        Storage Manager
-                                    </Text>
-                                </View>
-                                <View className="bg-blue-600 rounded-full p-2">
-                                    <Ionicons name="person" size={16} color="white" />
-                                </View>
-                            </View>
-                            
-                            <View className="border-t border-blue-200 pt-3">
-                                <Text className="text-xs text-blue-600 mb-1">Địa chỉ</Text>
-                                <Text className="text-gray-700 text-sm">
-                                    📍 {storageData.address || 'Không có thông tin địa chỉ'}
-                                </Text>
-                            </View>
-
-                            {storageData.keeperPhoneNumber && (
-                                <View className="border-t border-blue-200 pt-3 mt-3">
-                                    <Text className="text-xs text-blue-600 mb-1">Liên hệ</Text>
-                                    <Text className="text-gray-700 text-sm">
-                                        📞 {storageData.keeperPhoneNumber}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
-                    </View>
-                )}
-
-                {/* Rating Information */}
-                <View className="bg-white rounded-2xl p-6 mb-4 border border-gray-100">
-                    <View className="flex-row items-center mb-6">
-                        <View className="bg-emerald-100 rounded-full p-2 mr-3">
-                            <Ionicons name="information-circle" size={20} color="#059669" />
-                        </View>
-                        <Text className="text-lg font-JakartaBold text-gray-900">
-                            Thông tin đánh giá
-                        </Text>
-                    </View>
-
-                    <View className="space-y-4">
-                        {/* Rating Date */}
-                        <View className="bg-gray-50 rounded-xl p-4">
-                            <View className="flex-row items-center justify-between">
-                                <View className="flex-row items-center flex-1">
-                                    <View className="bg-blue-100 rounded-full p-2 mr-3">
-                                        <Ionicons name="calendar-outline" size={16} color="#3b82f6" />
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className="text-sm text-gray-500 font-JakartaMedium">
-                                            Ngày tạo
-                                        </Text>
-                                        <Text className="text-gray-900 font-JakartaBold text-base">
-                                            {formatRatingDate(rating.ratingDate)}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </View>
-                        </View>
-                        
-                        {/* Rating Score */}
-                        <View className="bg-amber-50 rounded-xl p-4">
-                            <View className="flex-row items-center justify-between">
-                                <View className="flex-row items-center flex-1">
-                                    <View className="bg-amber-100 rounded-full p-2 mr-3">
-                                        <Ionicons name="star" size={16} color="#f59e0b" />
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className="text-sm text-gray-500 font-JakartaMedium">
-                                            Số sao đánh giá
-                                        </Text>
-                                        <View className="flex-row items-center mt-1">
-                                            <Text className="text-gray-900 font-JakartaBold text-lg mr-2">
-                                                {rating.star}
-                                            </Text>
-                                            <StarRating
-                                                rating={rating.star}
-                                                size="small"
-                                                readonly={true}
-                                                showValue={false}
-                                            />
-                                        </View>
-                                    </View>
-                                </View>
-                            </View>
-                        </View>
-
-                        {/* Rating Status */}
-                        <View className="bg-green-50 rounded-xl p-4">
-                            <View className="flex-row items-center justify-between">
-                                <View className="flex-row items-center flex-1">
-                                    <View className="bg-green-100 rounded-full p-2 mr-3">
-                                        <Ionicons name="checkmark-circle" size={16} color="#059669" />
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className="text-sm text-gray-500 font-JakartaMedium">
-                                            Trạng thái
-                                        </Text>
-                                        <View className="flex-row items-center mt-1">
-                                            <View className="bg-green-500 rounded-full px-3 py-1">
-                                                <Text className="text-white text-sm font-JakartaBold">
-                                                    Đã đăng
-                                                </Text>
-                                            </View>
-                                            <Text className="text-green-700 text-xs font-JakartaMedium ml-2">
-                                                Công khai
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            </View>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Action Buttons */}
-                <View className="mb-8">
-                    <TouchableOpacity
-                        onPress={handleEditRating}
-                        className="bg-blue-500 rounded-2xl py-4 px-6 flex-row items-center justify-center mb-3"
-                    >
-                        <Ionicons name="pencil" size={18} color="white" />
-                        <Text className="text-white font-JakartaBold ml-2 text-base">
-                            Chỉnh sửa đánh giá
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        onPress={handleDeleteRating}
-                        disabled={isDeleting || deleteRatingMutation.isPending}
-                        className="bg-red-500 rounded-2xl py-4 px-6 flex-row items-center justify-center"
-                    >
-                        {isDeleting || deleteRatingMutation.isPending ? (
-                            <ActivityIndicator size="small" color="white" />
-                        ) : (
-                            <Ionicons name="trash-outline" size={18} color="white" />
-                        )}
-                        <Text className="text-white font-JakartaBold ml-2 text-base">
-                            {isDeleting || deleteRatingMutation.isPending ? 'Đang xóa...' : 'Xóa đánh giá'}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View className="h-6" />
             </ScrollView>
+
+            {/* Delete Confirmation Modal */}
+            <ConfirmationModal
+                visible={showDeleteConfirm}
+                title="Delete Rating"
+                message={`Are you sure you want to delete this ${rating?.star}-star rating? This action cannot be undone.`}
+                confirmText="Delete"
+                cancelText="Cancel"
+                confirmColor="#dc2626"
+                icon="trash-outline"
+                iconColor="#dc2626"
+                isLoading={isDeleting || deleteRatingMutation.isPending}
+                onConfirm={confirmDelete}
+                onCancel={() => setShowDeleteConfirm(false)}
+            />
+
+            {/* Success Modal */}
+            <CustomModal
+                isVisible={showSuccessModal}
+                type="success"
+                title="Success!"
+                message="Your rating has been deleted successfully."
+                buttonText="Go to Reviews"
+                onConfirm={() => {
+                    setShowSuccessModal(false);
+                    router.push('/(root)/(tabs)/reviews');
+                }}
+            />
+
+            {/* Error Modal */}
+            <CustomModal
+                isVisible={showErrorModal}
+                type="error"
+                title="Error"
+                message={errorMessage}
+                buttonText="OK"
+                onConfirm={() => setShowErrorModal(false)}
+            />
         </SafeAreaView>
     )
 }

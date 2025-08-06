@@ -2,7 +2,7 @@ import { Redirect } from 'expo-router'
 import { useEffect, useState } from 'react'
 import 'react-native-get-random-values'
 
-import { authAPI } from '@/lib/api'
+import { authAPI } from '@/hooks/api'
 import { useUserStore } from '@/store'
 
 const Page = () => {

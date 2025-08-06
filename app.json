@@ -57,7 +57,7 @@
       "expo-web-browser"
     ],
     "scheme": "packpals",
-    "slug": "PackPals",
+    "slug": "packpals",
     "splash": {
       "backgroundColor": "#2F80ED",
       "image": "./assets/images/splash.png",
@@ -69,6 +69,15 @@
       "bundler": "metro",
       "favicon": "./assets/images/favicon.png",
       "output": "server"
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": "https://packpals.com/"
+      },
+      "eas": {
+        "projectId": "ae45f3f0-1b13-4539-8ff0-a759fae40baf"
+      }
+    },
+    "owner": "nguyenphathuy"
   }
 }

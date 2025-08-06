@@ -1,9 +1,7 @@
-import { useCreatePayOSPayment, useCreatePayOSTransaction, usePayOSPaymentInfo } from '@/lib/query/hooks'
-import React, { useState } from 'react'
+import { useCreatePayOSPayment, useCreatePayOSTransaction } from '@/hooks/query'
+import React, { useCallback, useState } from 'react'
 import {
     ActivityIndicator,
-    Alert,
-    Linking,
     Modal,
     ScrollView,
     Text,
@@ -11,6 +9,15 @@ import {
     View
 } from 'react-native'
 import Ionicons from 'react-native-vector-icons/Ionicons'
+import { WebView } from 'react-native-webview'
+import CustomModal from './CustomModal'
+
+// Helper function
+const formatCurrency = (amount: number) => {
+    // Round up to nearest 1000 VND for cleaner display
+    const roundedAmount = Math.ceil(amount / 1000) * 1000;
+    return roundedAmount.toLocaleString();
+}
 
 interface PayOSPaymentModalProps {
     visible: boolean
@@ -33,36 +40,31 @@ export const PayOSPaymentModal: React.FC<PayOSPaymentModalProps> = ({
     customerEmail,
     customerPhone
 }) => {
-    const [paymentCodeId, setPaymentCodeId] = useState<number | null>(null)
-    const [transactionId, setTransactionId] = useState<string | null>(null)
-    const [paymentStep, setPaymentStep] = useState<'init' | 'creating' | 'pending' | 'processing' | 'completed' | 'failed'>('init')
+    const [paymentStep, setPaymentStep] = useState<'init' | 'creating' | 'embedded' | 'completed' | 'failed'>('init')
+    const [showErrorModal, setShowErrorModal] = useState(false)
+    const [errorMessage, setErrorMessage] = useState('')
+    const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null)
+    const [paymentCode, setPaymentCode] = useState<string>('')
 
     // PayOS hooks
     const createPaymentMutation = useCreatePayOSPayment({
         onSuccess: (response) => {
             console.log('✅ Payment link created:', response)
-            setPaymentCodeId(response.orderCode)
-            setPaymentStep('pending')
-            
-            // Close modal and open payment URL - app will handle redirect
-            onClose()
-            
-            // Open payment URL in browser
-            Linking.openURL(response.checkoutUrl).catch(() => {
-                Alert.alert('Error', 'Unable to open payment page. Please try again.')
-            })
+            setPaymentCode(response.orderCode.toString())
+            setCheckoutUrl(response.checkoutUrl)
+            setPaymentStep('embedded')
         },
         onError: (error) => {
             console.error('❌ Payment creation failed:', error)
             setPaymentStep('failed')
-            Alert.alert('Payment Error', error.message || 'Failed to create payment. Please try again.')
+            setErrorMessage(error.message || 'Failed to create payment. Please try again.')
+            setShowErrorModal(true)
         }
     })
 
     const createTransactionMutation = useCreatePayOSTransaction({
         onSuccess: (response) => {
             console.log('✅ Transaction created:', response)
-            setTransactionId(response.id)
         },
         onError: (error) => {
             console.error('❌ Transaction creation failed:', error)
@@ -70,37 +72,40 @@ export const PayOSPaymentModal: React.FC<PayOSPaymentModalProps> = ({
         }
     })
 
-    // Poll payment status
-    const { data: paymentInfo, isLoading: isPolling } = usePayOSPaymentInfo(
-        paymentCodeId || 0,
-        {
-            enabled: paymentStep === 'pending' && !!paymentCodeId,
-            onSuccess: (data) => {
-                console.log('📊 Payment status:', data.status)
-                if (data.status === 'PAID') {
-                    setPaymentStep('completed')
-                    setTimeout(() => {
-                        onSuccess()
-                        handleClose()
-                    }, 2000)
-                } else if (data.status === 'CANCELLED') {
-                    setPaymentStep('failed')
-                }
-            }
-        }
-    )
-
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         setPaymentStep('init')
-        setPaymentCodeId(null)
-        setTransactionId(null)
+        setCheckoutUrl(null)
+        setPaymentCode('')
         onClose()
+    }, [onClose])
+
+    // Handle WebView navigation for payment result
+    const handleWebViewNavigationStateChange = (navState: any) => {
+        const { url } = navState
+        console.log('🌐 WebView URL:', url)
+        
+        // Check for success URL
+        if (url.includes('payment-success') || url.includes('success')) {
+            console.log('✅ Payment detected as successful')
+            setPaymentStep('completed')
+            setTimeout(() => {
+                onSuccess()
+                handleClose()
+            }, 1500)
+        }
+        
+        // Check for cancel URL
+        if (url.includes('payment-cancel') || url.includes('cancel')) {
+            console.log('❌ Payment cancelled')
+            setPaymentStep('failed')
+        }
     }
 
     const handleStartPayment = () => {
         // Validate minimum amount requirement (PayOS minimum might be 2000 VND)
         if (amount < 2000) {
-            Alert.alert('Payment Error', 'Minimum payment amount is 2,000 VND')
+            setErrorMessage('Minimum payment amount is 2,000 VND')
+            setShowErrorModal(true)
             return
         }
         
@@ -109,15 +114,15 @@ export const PayOSPaymentModal: React.FC<PayOSPaymentModalProps> = ({
         // Generate unique payment code with timestamp to avoid collisions
         const timestamp = Date.now()
         const random = Math.floor(Math.random() * 999999)
-        const paymentCode = `${timestamp}${random}`.slice(0, 12) // Limit to 12 digits
+        const generatedPaymentCode = `${timestamp}${random}`.slice(0, 12) // Limit to 12 digits
         
-        // Create PayOS payment link
+        // Create PayOS payment link for embedded form
         createPaymentMutation.mutate({
             amount,
-            description: `PackPals Storage Order`, // Simplified without Vietnamese chars
-            returnUrl: `https://a169fb8b36f3.ngrok-free.app/payment/success?orderCode=${paymentCode}&orderId=${orderId}`, // Updated ngrok URL
-            cancelUrl: `https://a169fb8b36f3.ngrok-free.app/payment/cancel?orderCode=${paymentCode}&orderId=${orderId}`,   // Updated ngrok URL
-            paymentCode,
+            description: `PackPals Storage Order`, 
+            returnUrl: `exp://packpals/payment-success?orderCode=${generatedPaymentCode}&orderId=${orderId}`,
+            cancelUrl: `exp://packpals/payment-cancel?orderCode=${generatedPaymentCode}&orderId=${orderId}`,
+            paymentCode: generatedPaymentCode,
             orderId,
             buyerEmail: customerEmail,
             buyerPhone: customerPhone
@@ -128,14 +133,14 @@ export const PayOSPaymentModal: React.FC<PayOSPaymentModalProps> = ({
             amount,
             description: `PackPals - ${description}`,
             orderId,
-            transactionCode: paymentCode
+            transactionCode: generatedPaymentCode
         })
     }
 
     const handleRetry = () => {
         setPaymentStep('init')
-        setPaymentCodeId(null)
-        setTransactionId(null)
+        setCheckoutUrl(null)
+        setPaymentCode('')
     }
 
     const getStepContent = () => {
@@ -157,7 +162,7 @@ export const PayOSPaymentModal: React.FC<PayOSPaymentModalProps> = ({
                             <View className="flex-row items-center justify-between">
                                 <Text className="text-blue-700 font-JakartaMedium">Amount to pay:</Text>
                                 <Text className="text-blue-900 text-lg font-JakartaBold">
-                                    {amount.toLocaleString()} VND
+                                    {formatCurrency(amount)} VND
                                 </Text>
                             </View>
                         </View>
@@ -187,34 +192,66 @@ export const PayOSPaymentModal: React.FC<PayOSPaymentModalProps> = ({
                     </View>
                 )
 
-            case 'pending':
+            case 'embedded':
                 return (
-                    <View className="items-center">
-                        <View className="w-20 h-20 bg-orange-50 rounded-full items-center justify-center mb-6">
-                            <Ionicons name="time-outline" size={40} color="#f59e0b" />
-                        </View>
-                        <Text className="text-xl font-JakartaBold text-gray-900 mb-2">
-                            Payment Pending
-                        </Text>
-                        <Text className="text-sm text-gray-600 text-center mb-6 leading-5">
-                            Complete your payment in the opened browser window. 
-                            This dialog will update automatically when payment is confirmed.
-                        </Text>
-                        
-                        {isPolling && (
-                            <View className="flex-row items-center mb-4">
-                                <ActivityIndicator size="small" color="#3b82f6" />
-                                <Text className="text-blue-600 font-JakartaMedium ml-2">
-                                    Checking payment status...
+                    <View className="flex-1">
+                        <View className="items-center mb-3">
+                            <View className="w-12 h-12 bg-blue-50 rounded-full items-center justify-center mb-2">
+                                <Ionicons name="card" size={24} color="#3b82f6" />
+                            </View>
+                            <Text className="text-base font-JakartaBold text-gray-900 mb-1">
+                                Complete Payment
+                            </Text>
+                            <Text className="text-xs text-gray-600 text-center mb-2 leading-4">
+                                Complete your payment in the form below
+                            </Text>
+                            
+                            <View className="bg-blue-50 rounded-lg p-2 mb-3">
+                                <Text className="text-blue-700 text-center font-JakartaMedium text-xs">
+                                    Code: {paymentCode}
                                 </Text>
                             </View>
-                        )}
-
-                        <View className="bg-gray-50 rounded-xl p-4 w-full">
-                            <Text className="text-gray-700 font-JakartaMedium text-center">
-                                Payment Code: {paymentCodeId}
-                            </Text>
                         </View>
+
+                        {checkoutUrl && (
+                            <View className="w-full flex-1" style={{ minHeight: 500, maxHeight: 600 }}>
+                                <WebView
+                                    source={{ uri: checkoutUrl }}
+                                    onNavigationStateChange={handleWebViewNavigationStateChange}
+                                    startInLoadingState={true}
+                                    renderLoading={() => (
+                                        <View className="flex-1 items-center justify-center">
+                                            <ActivityIndicator size="large" color="#3b82f6" />
+                                            <Text className="text-gray-600 mt-2">Loading payment form...</Text>
+                                        </View>
+                                    )}
+                                    style={{ 
+                                        borderRadius: 12,
+                                        overflow: 'hidden',
+                                        backgroundColor: '#f9fafb',
+                                        flex: 1
+                                    }}
+                                    scalesPageToFit={true}
+                                    scrollEnabled={true}
+                                    bounces={false}
+                                    showsVerticalScrollIndicator={true}
+                                    showsHorizontalScrollIndicator={false}
+                                    automaticallyAdjustContentInsets={false}
+                                    contentInset={{ top: 0, left: 0, bottom: 0, right: 0 }}
+                                    contentInsetAdjustmentBehavior="never"
+                                />
+                            </View>
+                        )}
+                        
+                        <TouchableOpacity
+                            onPress={handleClose}
+                            className="bg-gray-100 rounded-lg py-2 px-4 mt-2"
+                            activeOpacity={0.8}
+                        >
+                            <Text className="text-gray-700 font-JakartaBold text-xs text-center">
+                                Cancel Payment
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                 )
 
@@ -234,7 +271,7 @@ export const PayOSPaymentModal: React.FC<PayOSPaymentModalProps> = ({
                         
                         <View className="bg-green-50 rounded-xl p-4 w-full">
                             <Text className="text-green-700 font-JakartaMedium text-center">
-                                Amount: {amount.toLocaleString()} VND ✓
+                                Amount: {formatCurrency(amount)} VND ✓
                             </Text>
                         </View>
                     </View>
@@ -278,7 +315,7 @@ export const PayOSPaymentModal: React.FC<PayOSPaymentModalProps> = ({
                     <View className="flex-row items-center justify-between">
                         <TouchableOpacity 
                             onPress={handleClose}
-                            disabled={paymentStep === 'creating' || paymentStep === 'processing'}
+                            disabled={paymentStep === 'creating' || paymentStep === 'embedded'}
                         >
                             <Ionicons name="close" size={24} color="#374151" />
                         </TouchableOpacity>
@@ -289,10 +326,28 @@ export const PayOSPaymentModal: React.FC<PayOSPaymentModalProps> = ({
                     </View>
                 </View>
 
-                <ScrollView className="flex-1 px-6 py-8">
+                <ScrollView 
+                    className="flex-1 px-6"
+                    contentContainerStyle={{ 
+                        flexGrow: 1,
+                        paddingTop: 20,
+                        ...(paymentStep === 'embedded' && { paddingBottom: 10 })
+                    }}
+                    showsVerticalScrollIndicator={false}
+                >
                     {getStepContent()}
                 </ScrollView>
             </View>
+            
+            {/* Error Modal */}
+            <CustomModal
+                isVisible={showErrorModal}
+                type="error"
+                title="Payment Error"
+                message={errorMessage}
+                buttonText="OK"
+                onConfirm={() => setShowErrorModal(false)}
+            />
         </Modal>
     )
 }

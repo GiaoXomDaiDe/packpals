@@ -1,6 +1,6 @@
+import { NotificationProvider } from '@/context/NotificationContext'
+import { QueryProvider } from '@/hooks/provider'
 import { useDeepLinking } from '@/hooks/useDeepLinking'
-import { NotificationProvider } from '@/lib/context/NotificationContext'
-import { QueryProvider } from '@/lib/query/provider'
 import { useFonts } from 'expo-font'
 import { SplashScreen, Stack } from 'expo-router'
 import { useEffect } from 'react'

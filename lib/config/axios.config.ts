@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { apiConfig } from './config'
 
-// Create axios instance with environment-based configuration
+
 const apiClient: AxiosInstance = axios.create({
     baseURL: apiConfig.baseURL,
     timeout: apiConfig.timeout,
@@ -26,13 +26,15 @@ apiClient.interceptors.request.use(
 
             // Log request in development
             if (apiConfig.enableLogging) {
-                console.log('🌐 API Request:', {
+                const logData = {
                     method: config.method?.toUpperCase(),
                     url: config.url,
                     baseURL: config.baseURL,
                     hasAuth: !!token,
-                    data: config.data ? 'Present' : 'None'
-                })
+                    hasData: !!config.data,
+                    ...(config.data && { requestData: config.data })
+                }
+                console.log('🌐 API Request:', JSON.stringify(logData, null, 2))
             }
         } catch (error) {
             console.error('❌ Error in request interceptor:', error)
@@ -41,7 +43,12 @@ apiClient.interceptors.request.use(
     },
     (error) => {
         if (apiConfig.enableLogging) {
-            console.error('❌ Request interceptor error:', error)
+            const errorData = {
+                type: 'Request Interceptor Error',
+                message: error.message,
+                stack: error.stack
+            }
+            console.error('❌ Request interceptor error:', JSON.stringify(errorData, null, 2))
         }
         return Promise.reject(error)
     }
@@ -52,24 +59,30 @@ apiClient.interceptors.response.use(
     (response: AxiosResponse) => {
         // Log successful responses in development
         if (apiConfig.enableLogging) {
-            console.log('✅ API Response:', {
+            const logData = {
                 status: response.status,
+                statusText: response.statusText,
                 url: response.config.url,
                 method: response.config.method?.toUpperCase(),
+                hasData: !!response.data,
+                dataKeys: response.data ? Object.keys(response.data) : [],
                 dataSize: response.data ? Object.keys(response.data).length : 0
-            })
+            }
+            console.log('✅ API Response:', JSON.stringify(logData, null, 2))
         }
         return response
     },
     async (error) => {
         // Log errors
         if (apiConfig.enableLogging) {
-            console.error('❌ API Error:', {
+            const errorData = {
                 status: error.response?.status,
                 url: error.config?.url,
                 method: error.config?.method?.toUpperCase(),
-                message: error.response?.data?.message || error.message
-            })
+                message: error.response?.data?.message || error.message,
+                responseData: error.response?.data || null
+            }
+            console.error('❌ API Error:', JSON.stringify(errorData, null, 2))
         }
 
         // Handle 401 Unauthorized - clear auth data and potentially redirect

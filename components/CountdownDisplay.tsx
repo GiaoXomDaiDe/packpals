@@ -1,5 +1,5 @@
+import { OrderCountdownData } from '@/hooks/api/order.api';
 import { CountdownData } from '@/hooks/useRealTimeCountdown';
-import { OrderCountdownData } from '@/lib/api/order.api';
 import React from 'react';
 import { Text, View } from 'react-native';
 

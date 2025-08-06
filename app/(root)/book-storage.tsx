@@ -1,26 +1,21 @@
 import CustomButton from '@/components/CustomButton'
+import CustomModal from '@/components/CustomModal'
+import DetailHeader from '@/components/DetailHeader'
 import FormInputField from '@/components/FormInputField'
 import { icons } from '@/constants'
-import { useBookStorageForm } from '@/hooks/useBookStorageForm'
 import {
     useCreateOrder,
     useCreateOrderDetails,
     useSizeList,
     useUserProfile
-} from '@/lib/query/hooks'
-import {
-    CreateOrderDetailsParams,
-    CreateOrderRequest,
-    SizeApiData,
-    StorageMarkerData,
-    UserProfileData
-} from '@/lib/types/type'
+} from '@/hooks/query'
+import { useBookStorageForm } from '@/hooks/useBookStorageForm'
 import { useLocationStore, useStorageStore, useUserStore } from '@/store'
 import * as Linking from 'expo-linking'
 import { router } from 'expo-router'
+import { useEffect, useRef, useState } from 'react'
 import {
     ActivityIndicator,
-    Alert,
     Image,
     ScrollView,
     Text,
@@ -29,13 +24,45 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from 'react-native-vector-icons/Ionicons'
+import {
+    CreateOrderDetailsParams,
+    CreateOrderRequest,
+    SizeApiData,
+    StorageMarkerData,
+    UserProfileData
+} from '../../types/type'
 
 const BookStorage = () => {
-    console.log('Rendering BookStorage component-------------------------------------------------')
+    const renderCount = useRef(0)
+    renderCount.current += 1
+    
+    // Modal states
+    const [showErrorModal, setShowErrorModal] = useState(false)
+    const [errorMessage, setErrorMessage] = useState('')
+    const [showSuccessModal, setShowSuccessModal] = useState(false)
+    const [successMessage, setSuccessMessage] = useState('')
+    
+    console.log(`📋 BookStorage render #${renderCount.current}`)
     const { userAddress } = useLocationStore()
     const { user } = useUserStore()
     const { storages, selectedStorage } = useStorageStore()
-    console.log(storages, 'Available Storages')
+    
+    // References for tracking changes and preventing excessive logging
+    const prevSelectedStorage = useRef(selectedStorage)
+    const prevSizesCount = useRef(0)
+    const prevStorageDetails = useRef<string | undefined>(undefined)
+    const prevCreatedOrderId = useRef<string | null>(null)
+    
+    // Only log storage details on first render or when selection changes
+    if (prevSelectedStorage.current !== selectedStorage || renderCount.current === 1) {
+        console.log('🎯 Selected storage changed:', {
+            previous: prevSelectedStorage.current,
+            current: selectedStorage,
+            availableStorages: storages.length,
+            storageIds: storages.map(s => `${s.id.slice(0, 8)}...`)
+        })
+        prevSelectedStorage.current = selectedStorage
+    }
     
     const {
         control,
@@ -58,7 +85,13 @@ const BookStorage = () => {
         isLoading: loadingSizes,
         error: sizesError
     } = useSizeList({ pageSize: 50 })
-    console.log(sizesResponse, 'Available Sizes')
+    
+    // Only log sizes on first render or when sizes change
+    const currentSizesCount = sizesResponse?.data?.data?.length || 0
+    if (prevSizesCount.current !== currentSizesCount) {
+        console.log(`📐 Sizes updated: ${currentSizesCount} sizes available`)
+        prevSizesCount.current = currentSizesCount
+    }
     const {
         data: userProfileResponse
     } = useUserProfile(user?.id || '', {
@@ -88,8 +121,50 @@ const BookStorage = () => {
     const availableSizes: SizeApiData[] = sizesResponse?.data?.data || []
 
     const storageDetails: StorageMarkerData | undefined = storages.find(storage => storage.id === selectedStorage)
+    
+    console.log('🔍 Storage lookup result:', {
+        selectedStorageId: selectedStorage,
+        storageFound: !!storageDetails,
+        totalStorages: storages.length,
+        storageTitle: storageDetails?.title || 'Not found',
+        renderCount: renderCount.current,
+        availableStorageIds: storages.slice(0, 3).map(s => s.id.slice(0, 8) + '...')
+    })
 
+    // Handle case where selected storage becomes null unexpectedly
+    // This prevents infinite re-renders and navigates back automatically
+    useEffect(() => {
+        if (!selectedStorage && renderCount.current > 1) {
+            console.log('⚠️ Selected storage is null, navigating back to prevent infinite renders')
+            // Small delay to prevent navigation issues
+            setTimeout(() => {
+                if (router.canGoBack()) {
+                    router.back()
+                } else {
+                    router.replace('/(root)/(tabs)/home')
+                }
+            }, 100)
+        }
+    }, [selectedStorage])
+
+    // Show loading while storages are empty but we have a selected storage
+    if (selectedStorage && storages.length === 0) {
+        console.log('⏳ Waiting for storages to load...')
+        return (
+            <SafeAreaView className="bg-general-500 flex-1">
+                <View className="flex-1 items-center justify-center">
+                    <ActivityIndicator size="large" color="#2563eb" />
+                    <Text className="text-lg font-JakartaSemiBold mt-4 text-center">
+                        Loading storage details...
+                    </Text>
+                </View>
+            </SafeAreaView>
+        )
+    }
+
+    // Ensure storageDetails exists before rendering main content
     if (!storageDetails) {
+        console.log('❌ Storage details not available')
         return (
             <SafeAreaView className="bg-general-500 flex-1">
                 <View className="flex flex-col items-center justify-center p-5">
@@ -101,7 +176,13 @@ const BookStorage = () => {
                     </Text>
                     <CustomButton
                         title="Go Back"
-                        onPress={() => router.back()}
+                        onPress={() => {
+                            if (router.canGoBack()) {
+                                router.back()
+                            } else {
+                                router.replace('/(root)/(tabs)/home')
+                            }
+                        }}
                     />
                 </View>
             </SafeAreaView>
@@ -112,21 +193,25 @@ const BookStorage = () => {
     const handleBookingConfirmation = async () => {
         const validationErrors = validateForm()
         if (validationErrors.length > 0) {
-            Alert.alert('Validation Error', validationErrors.join('\n'))
+            setErrorMessage(validationErrors.join('\n'))
+            setShowErrorModal(true)
             return
         }
 
         if (!user?.id) {
-            Alert.alert('Error', 'User not authenticated. Please login again.')
+            setErrorMessage('User not authenticated. Please login again.')
+            setShowErrorModal(true)
             return
         }
 
         if (!selectedStorage) {
-            Alert.alert('Error', 'No storage selected. Please go back and select a storage.')
+            setErrorMessage('No storage selected. Please go back and select a storage.')
+            setShowErrorModal(true)
             return
         }
         if (!(userProfileResponse as any)?.data) {
-            Alert.alert('Error', 'User profile not loaded. Please try again.')
+            setErrorMessage('User profile not loaded. Please try again.')
+            setShowErrorModal(true)
             return
         }
 
@@ -136,10 +221,8 @@ const BookStorage = () => {
             let actualRenterId: string | undefined = userData.renter?.renterId
             
             if (!actualRenterId) {
-                Alert.alert(
-                    'Account Setup Issue', 
-                    'Your account may not be properly configured as a renter. Please try logging out and back in.'
-                )
+                setErrorMessage('Your account may not be properly configured as a renter. Please try logging out and back in.')
+                setShowErrorModal(true)
                 return
             }
 
@@ -169,7 +252,8 @@ const BookStorage = () => {
                     
                     if (!orderId) {
                         console.error('❌ ERROR: orderId is undefined when creating order details!')
-                        Alert.alert('Error', 'Order ID is missing. Please try again.')
+                        setErrorMessage('Order ID is missing. Please try again.')
+                        setShowErrorModal(true)
                         setIsLoading(false)
                         return
                     }
@@ -184,11 +268,14 @@ const BookStorage = () => {
                     createOrderDetailsMutation.mutate(orderDetailsRequest, {
                         onSuccess: () => {
                             console.log('✅ Order and details created successfully with ID:', orderId)
+                            setSuccessMessage('Your storage booking has been successfully created! You can view your booking details in the Orders section.')
+                            setShowSuccessModal(true)
                             setIsLoading(false) // Set loading to false only after everything succeeds
                         },
                         onError: (error) => {
                             console.error('❌ Order details creation failed:', error)
-                            Alert.alert('Error', 'Failed to create order details. The order was created but details failed. Please contact support.')
+                            setErrorMessage('Failed to create order details. The order was created but details failed. Please contact support.')
+                            setShowErrorModal(true)
                             setIsLoading(false) // Set loading to false even on error
                         }
                     })
@@ -196,36 +283,45 @@ const BookStorage = () => {
                 onError: (error) => {
                     console.error('❌ Order creation failed:', error)
                     const errorMessage = error?.message || 'Unknown error'
-                    Alert.alert('Order Creation Failed', `Failed to create order: ${errorMessage}`)
+                    setErrorMessage(`Failed to create order: ${errorMessage}`)
+                    setShowErrorModal(true)
                     setIsLoading(false) // Set loading to false on error
                 }
             })
         } catch (error) {
             console.error('Error creating order:', error)
-            Alert.alert('Error', 'An error occurred while creating your order.')
+            setErrorMessage('An error occurred while creating your order.')
+            setShowErrorModal(true)
             setIsLoading(false) // Set loading to false only in catch block
         }
     }
-    console.log(storageDetails, 'Storage Details')
-    // Debug logging for orderId tracking
-    console.log('🔍 Current createdOrderId state:', createdOrderId)
+    
+    // Only log storage details when it changes
+    if (prevStorageDetails.current !== storageDetails?.id) {
+        console.log(storageDetails, 'Storage Details')
+        prevStorageDetails.current = storageDetails?.id
+    }
+    
+    // Only log orderId when it changes
+    if (prevCreatedOrderId.current !== createdOrderId) {
+        console.log('🔍 Current createdOrderId state:', createdOrderId)
+        prevCreatedOrderId.current = createdOrderId
+    }
     
     return (
         <SafeAreaView className="bg-general-500 flex-1">
+                <DetailHeader 
+                    title="Book Storage"
+                    showBackButton={true}
+                    onBackPress={() => {
+                        if (router.canGoBack()) {
+                            router.back()
+                        } else {
+                            router.replace('/(root)/(tabs)/home')
+                        }
+                    }}
+                />
                 <ScrollView className="px-5 py-3">
-                    <View className="flex flex-row items-center justify-between mb-5">
-                        <TouchableOpacity onPress={() => router.back()}>
-                            <Image
-                                source={icons.backArrow}
-                                className="w-6 h-6"
-                                resizeMode="contain"
-                            />
-                        </TouchableOpacity>
-                        <Text className="text-xl font-JakartaExtraBold">
-                            Book Storage
-                        </Text>
-                        <View className="w-6" />
-                    </View>
 
                     {/* Storage Information - Simplified */}
                     <View className="bg-white rounded-xl p-4 mb-5">
@@ -403,14 +499,19 @@ const BookStorage = () => {
                                             <View className="flex-row items-center">
                                                 <TouchableOpacity
                                                     onPress={() => handleSizeSelection(size.id, false)}
-                                                    className="w-10 h-10 rounded-full bg-general-700 items-center justify-center mr-3"
+                                                    className="w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-3"
                                                     disabled={!selectedSizes[size.id]}
+                                                    style={{
+                                                        opacity: selectedSizes[size.id] ? 1 : 0.5
+                                                    }}
                                                 >
-                                                    <Ionicons 
-                                                        name="remove" 
-                                                        size={20} 
-                                                        color={selectedSizes[size.id] ? "#000" : "#9CA3AF"} 
-                                                    />
+                                                    <Text style={{ 
+                                                        fontSize: 20, 
+                                                        fontWeight: 'bold',
+                                                        color: selectedSizes[size.id] ? "#000" : "#9CA3AF"
+                                                    }}>
+                                                        −
+                                                    </Text>
                                                 </TouchableOpacity>
                                                 
                                                 <View className="min-w-[40px] items-center">
@@ -421,9 +522,16 @@ const BookStorage = () => {
                                                 
                                                 <TouchableOpacity
                                                     onPress={() => handleSizeSelection(size.id, true)}
-                                                    className="w-10 h-10 rounded-full bg-primary-500 items-center justify-center ml-3"
+                                                    className="w-10 h-10 rounded-full bg-blue-600 items-center justify-center ml-3"
+                                                    activeOpacity={0.8}
                                                 >
-                                                    <Ionicons name="add" size={20} color="white" />
+                                                    <Text style={{ 
+                                                        fontSize: 20, 
+                                                        fontWeight: 'bold',
+                                                        color: 'white' 
+                                                    }}>
+                                                        +
+                                                    </Text>
                                                 </TouchableOpacity>
                                             </View>
                                         </View>
@@ -613,6 +721,29 @@ const BookStorage = () => {
                         />
                     ) : null}
                 </ScrollView>
+
+                {/* Error Modal */}
+                <CustomModal
+                    isVisible={showErrorModal}
+                    type="error"
+                    title="Error"
+                    message={errorMessage}
+                    buttonText="OK"
+                    onConfirm={() => setShowErrorModal(false)}
+                />
+
+                {/* Success Modal */}
+                <CustomModal
+                    isVisible={showSuccessModal}
+                    type="success"
+                    title="Success!"
+                    message={successMessage}
+                    buttonText="View Orders"
+                    onConfirm={() => {
+                        setShowSuccessModal(false)
+                        router.push('/(root)/(tabs)/orders')
+                    }}
+                />
         </SafeAreaView>
     )
 }

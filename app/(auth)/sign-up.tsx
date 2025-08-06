@@ -1,13 +1,13 @@
+import CustomModal from '@/components/CustomModal'
 import InputField from '@/components/InputField'
 import { icons } from '@/constants'
-import { useRegister } from '@/lib/query/hooks/useAuthQueries'
+import { useRegister } from '@/hooks/query/useAuthQueries'
 import { SignUpFormData, SignUpSchema } from '@/lib/schemas/auth.schema'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, router } from 'expo-router'
 import { useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
-    Alert,
     Keyboard,
     KeyboardAvoidingView,
     Platform,
@@ -17,48 +17,26 @@ import {
     TouchableWithoutFeedback,
     View,
 } from 'react-native'
-import { ReactNativeModal } from 'react-native-modal'
 import Ionicons from 'react-native-vector-icons/Ionicons'
 
 const SignUp = () => {
     const [openEye, setOpenEye] = useState(false)
     const [showSuccessModal, setShowSuccessModal] = useState(false)
+    const [errorModal, setErrorModal] = useState({ isVisible: false, message: '' })
     
     const registerMutation = useRegister({
         onSuccess: () => {
             setShowSuccessModal(true)
         },
         onError: (error: any) => {
-            console.error('Registration error:', error)
+            console.error('Lỗi đăng ký:', error)
             
-            const errorMessage = error.message || 'Registration failed. Please try again.'
+            const errorMessage = error.message || 'Đăng ký thất bại. Vui lòng thử lại.'
             
-            if (errorMessage.toLowerCase().includes('email')) {
-                setError('email', { 
-                    type: 'server', 
-                    message: 'This email is already registered. Please use a different email.' 
-                })
-            } else if (errorMessage.toLowerCase().includes('username')) {
-                setError('username', { 
-                    type: 'server', 
-                    message: 'This username is already taken. Please choose a different username.' 
-                })
-            } else if (errorMessage.toLowerCase().includes('phone')) {
-                setError('phoneNumber', { 
-                    type: 'server', 
-                    message: 'This phone number is already registered.' 
-                })
-            } else if (errorMessage.toLowerCase().includes('password')) {
-                setError('password', { 
-                    type: 'server', 
-                    message: 'Password does not meet requirements.' 
-                })
-            } else {
-                Alert.alert('Registration Failed', errorMessage)
-            }
-        },
-        onMutate: () => {
-            clearAllErrors()
+            setErrorModal({
+                isVisible: true,
+                message: errorMessage
+            })
         }
     })
     
@@ -72,7 +50,7 @@ const SignUp = () => {
             phoneNumber: '',
         },
     })
-    const { handleSubmit, setError, clearErrors } = registerForm
+    const { handleSubmit, clearErrors } = registerForm
 
     const toggleEye = () => setOpenEye((prev) => !prev)
 
@@ -81,6 +59,7 @@ const SignUp = () => {
     }
 
     const onSignUpPress = async (data: SignUpFormData) => {
+        clearAllErrors() // Clear errors trước khi gọi API
         registerMutation.mutate({
             email: data.email,
             password: data.password,
@@ -104,67 +83,64 @@ const SignUp = () => {
                             showsVerticalScrollIndicator={false}
                             contentContainerStyle={{ paddingBottom: 50 }}
                         >
-                            {/* Simple Header */}
-                            <View className="items-center pt-16 pb-8">
+                            {/* Header đơn giản */}
+                            <View className="items-center pt-24 pb-8">
                                 {/* Logo */}
                                 <Text className="text-2xl font-JakartaBold text-blue-600 mb-2">
                                     PackPals
                                 </Text>
                                 
-                                {/* Title */}
+                                {/* Tiêu đề */}
                                 <Text className="text-lg font-JakartaMedium text-gray-700">
-                                    Create your account
+                                    Tạo tài khoản của bạn
                                 </Text>
                             </View>
 
-                            {/* Form Container */}
+                            {/* Container form */}
                             <View className="px-6">
-                                {/* Form Fields */}
+                                {/* Các trường form */}
                                 <View className="space-y-4">
                                     <View>
-                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Username</Text>
+                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Tên người dùng</Text>
                                         <InputField
                                             name="username"
                                             label=""
-                                            placeholder="Enter your username"
+                                            placeholder="Nhập tên người dùng"
                                             icon={icons.person}
                                             autoCapitalize="none"
                                             textContentType="username"
                                         />
                                     </View>
-
                                     <View>
                                         <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Email</Text>
                                         <InputField
                                             name="email"
                                             label=""
-                                            placeholder="Enter your email"
+                                            placeholder="Nhập email của bạn"
                                             icon={icons.email}
                                             textContentType="emailAddress"
                                             keyboardType="email-address"
                                             autoCapitalize="none"
                                         />
                                     </View>
-
                                     <View>
-                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Phone Number</Text>
+                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Số điện thoại</Text>
                                         <InputField
                                             name="phoneNumber"
                                             label=""
-                                            placeholder="Enter your phone number"
+                                            placeholder="Nhập số điện thoại"
                                             icon={icons.person}
                                             keyboardType="phone-pad"
                                             textContentType="telephoneNumber"
                                         />
                                     </View>
-
                                     <View>
-                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Password</Text>
+                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Mật khẩu</Text>
                                         <View className="relative">
                                             <InputField
                                                 name="password"
                                                 label=""
-                                                placeholder="Enter your password"
+                                                placeholder="Nhập mật khẩu của bạn"
                                                 icon={icons.lock}
                                                 secureTextEntry={!openEye}
                                                 autoCapitalize="none"
@@ -174,7 +150,7 @@ const SignUp = () => {
                                                 onPress={toggleEye}
                                                 className="absolute right-4 top-2"
                                                 style={{
-                                                    height: 56, // Fixed height to match input field height
+                                                    height: 56,
                                                     justifyContent: 'center',
                                                     alignItems: 'center',
                                                     width: 24,
@@ -189,14 +165,13 @@ const SignUp = () => {
                                             </TouchableOpacity>
                                         </View>
                                     </View>
-
                                     <View>
-                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Confirm Password</Text>
+                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Xác nhận mật khẩu</Text>
                                         <View className="relative">
                                             <InputField
                                                 name="confirmPassword"
                                                 label=""
-                                                placeholder="Confirm your password"
+                                                placeholder="Xác nhận mật khẩu của bạn"
                                                 icon={icons.lock}
                                                 secureTextEntry={!openEye}
                                                 autoCapitalize="none"
@@ -206,7 +181,7 @@ const SignUp = () => {
                                                 onPress={toggleEye}
                                                 className="absolute right-4 top-2"
                                                 style={{
-                                                    height: 56, // Fixed height to match input field height
+                                                    height: 56,
                                                     justifyContent: 'center',
                                                     alignItems: 'center',
                                                     width: 24,
@@ -223,37 +198,34 @@ const SignUp = () => {
                                     </View>
                                 </View>
 
-                                {/* Sign Up Button */}
+                                {/* Nút đăng ký */}
                                 <TouchableOpacity
                                     onPress={handleSubmit(onSignUpPress)}
                                     disabled={registerMutation.isPending}
                                     className="bg-blue-600 py-4 rounded-lg mt-6 mb-6"
                                 >
                                     <Text className="text-white font-JakartaBold text-center text-base">
-                                        {registerMutation.isPending ? 'Creating Account...' : 'Sign Up'}
+                                        {registerMutation.isPending ? 'Đang tạo tài khoản...' : 'Đăng ký'}
                                     </Text>
                                 </TouchableOpacity>
 
-                                {/* Or Divider */}
+                                {/* Đường phân cách */}
                                 <View className="flex-row items-center mb-6">
                                     <View className="flex-1 h-px bg-gray-300" />
                                     <Text className="mx-4 text-gray-500 text-sm font-Jakarta">
-                                        or
+                                        hoặc
                                     </Text>
                                     <View className="flex-1 h-px bg-gray-300" />
                                 </View>
 
-                                {/* Social Login */}
-                                {/* <OAuth /> */}
-
-                                {/* Sign In Link */}
+                                {/* Liên kết đăng nhập */}
                                 <View className="items-center mb-8">
                                     <Link href="/sign-in" asChild>
                                         <TouchableOpacity>
                                             <Text className="text-gray-600 text-center font-Jakarta">
-                                                Already have an account?{' '}
+                                                Đã có tài khoản?{' '}
                                                 <Text className="text-blue-600 font-JakartaBold">
-                                                    Sign In
+                                                    Đăng nhập
                                                 </Text>
                                             </Text>
                                         </TouchableOpacity>
@@ -262,44 +234,29 @@ const SignUp = () => {
                             </View>
                         </ScrollView>
 
-                        {/* Success Modal */}
-                        <ReactNativeModal 
+                        {/* Modal thành công */}
+                        <CustomModal
                             isVisible={showSuccessModal}
-                            animationIn="slideInUp"
-                            animationOut="slideOutDown"
-                            backdropOpacity={0.5}
-                            backdropColor="#000"
-                            onBackdropPress={() => {}}
-                            onBackButtonPress={() => {}}
-                        >
-                            <View className="flex-1 justify-center px-6">
-                                <View className="bg-white rounded-2xl p-8 items-center">
-                                    <View className="w-20 h-20 bg-green-100 rounded-full items-center justify-center mb-6">
-                                        <Ionicons name="checkmark-circle" size={40} color="#10b981" />
-                                    </View>
-                                    
-                                    <Text className="text-2xl font-JakartaBold text-gray-900 text-center mb-3">
-                                        Account Created Successfully!
-                                    </Text>
-                                    
-                                    <Text className="text-gray-600 text-center mb-8 font-Jakarta leading-6">
-                                        Welcome to PackPals! Your account has been created successfully. Please sign in to continue.
-                                    </Text>
-                                    
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            setShowSuccessModal(false)
-                                            router.replace('/(auth)/sign-in')
-                                        }}
-                                        className="bg-blue-600 py-4 px-8 rounded-lg w-full"
-                                    >
-                                        <Text className="text-white font-JakartaBold text-center text-base">
-                                            Continue to Sign In
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        </ReactNativeModal>
+                            type="success"
+                            title="Tạo tài khoản thành công!"
+                            message="Chào mừng đến với PackPals! Tài khoản của bạn đã được tạo thành công. Vui lòng đăng nhập để tiếp tục."
+                            buttonText="Tiếp tục đăng nhập"
+                            onConfirm={() => {
+                                setShowSuccessModal(false)
+                                router.replace('/(auth)/sign-in')
+                            }}
+                        />
+
+                        {/* Error Modal */}
+                        <CustomModal
+                            isVisible={errorModal.isVisible}
+                            type="error"
+                            title="Đăng ký thất bại"
+                            message={errorModal.message}
+                            onConfirm={() => {
+                                setErrorModal({ isVisible: false, message: '' })
+                            }}
+                        />
                     </View>
                 </TouchableWithoutFeedback>
             </KeyboardAvoidingView>

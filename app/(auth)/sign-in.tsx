@@ -3,7 +3,6 @@ import { Link, router } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
-    Alert,
     Keyboard,
     KeyboardAvoidingView,
     Platform,
@@ -15,40 +14,33 @@ import {
 } from 'react-native'
 import Ionicons from 'react-native-vector-icons/Ionicons'
 
+import CustomModal from '@/components/CustomModal'
 import InputField from '@/components/InputField'
 import { icons } from '@/constants'
-import { useLogin } from '@/lib/query/hooks/useAuthQueries'
+import { useLogin } from '@/hooks/query/useAuthQueries'
+import useCustomModal from '@/hooks/useCustomModal'
 import { SignInFormData, SignInSchema } from '@/lib/schemas/auth.schema'
 import { useUserStore } from '@/store'
 
 const SignIn = () => {
     const { setUser } = useUserStore()
     const [openEye, setOpenEye] = useState(false)
+    const { modalState, showSuccess, showError, hideModal } = useCustomModal()
 
     const loginMutation = useLogin({
         onSuccess: (data) => {
             setUser(data.user, data.token)
-            Alert.alert('Success', 'Login successful!', [
-                {
-                    text: 'OK',
-                    onPress: () => {
-                        loginMutation.reset()
-                        router.replace('/(root)/(tabs)/home')
-                    }
-                }
-            ])
+            showSuccess(
+                'Thành công',
+                'Đăng nhập thành công!',
+                'Tiếp tục'
+            )
         },
         onError: (error: any) => {
-            if (error.message && error.message.includes('email')) {
-                form.setError('email', { message: error.message })
-            } else if (error.message && error.message.includes('password')) {
-                form.setError('password', { message: error.message })
-            } else {
-                Alert.alert('Error', error.message || 'Login failed. Please try again.')
-            }
-        },
-        onMutate: (variables) => {
-            form.clearErrors()
+            showError(
+                'Lỗi đăng nhập',
+                error.message || 'Đăng nhập thất bại. Vui lòng thử lại.'
+            )
         }
     })
 
@@ -66,12 +58,13 @@ const SignIn = () => {
 
     const onSignInPress = useCallback(
         async (data: SignInFormData) => {
+            form.clearErrors()
             loginMutation.mutate({
                 email: data.email,
                 password: data.password,
             })
         },
-        [loginMutation]
+        [loginMutation, form]
     )
 
     return (
@@ -88,31 +81,30 @@ const SignIn = () => {
                             showsVerticalScrollIndicator={false}
                             contentContainerStyle={{ paddingBottom: 50 }}
                         >
-                            {/* Simple Header */}
-                            <View className="items-center pt-16 pb-8">
+                            {/* Header đơn giản */}
+                            <View className="items-center pt-24 pb-8">
                                 {/* Logo */}
                                 <Text className="text-2xl font-JakartaBold text-blue-600 mb-2">
                                     PackPals
                                 </Text>
                                 
-                                {/* Title */}
+                                {/* Tiêu đề */}
                                 <Text className="text-lg font-JakartaMedium text-gray-700">
-                                    Welcome back
+                                    Chào mừng trở lại
                                 </Text>
-
                             </View>
 
-                            {/* Form Container */}
+                            {/* Container form */}
                             <View className="px-6">
-                                {/* Form Fields */}
+                                {/* Các trường form */}
                                 <View className="space-y-4">
-                                    {/* Email Field */}
+                                    {/* Trường Email */}
                                     <View>
                                         <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Email</Text>
                                         <InputField
                                             name="email"
                                             label=""
-                                            placeholder="Enter your email"
+                                            placeholder="Nhập email của bạn"
                                             icon={icons.email}
                                             textContentType="emailAddress"
                                             keyboardType="email-address"
@@ -120,14 +112,14 @@ const SignIn = () => {
                                         />
                                     </View>
 
-                                    {/* Password Field */}
+                                    {/* Trường mật khẩu */}
                                     <View>
-                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Password</Text>
+                                        <Text className="text-gray-700 text-sm mb-1 font-JakartaMedium">Mật khẩu</Text>
                                         <View className="relative">
                                             <InputField
                                                 name="password"
                                                 label=""
-                                                placeholder="Enter your password"
+                                                placeholder="Nhập mật khẩu của bạn"
                                                 icon={icons.lock}
                                                 secureTextEntry={!openEye}
                                                 autoCapitalize="none"
@@ -137,7 +129,7 @@ const SignIn = () => {
                                                 onPress={toggleEye}
                                                 className="absolute right-4 top-2"
                                                 style={{
-                                                    height: 56, // Fixed height to match input field height
+                                                    height: 56,
                                                     justifyContent: 'center',
                                                     alignItems: 'center',
                                                     width: 24,
@@ -154,37 +146,45 @@ const SignIn = () => {
                                     </View>
                                 </View>
 
-                                {/* Sign In Button */}
+                                {/* Nút đăng nhập */}
                                 <TouchableOpacity
                                     onPress={handleSubmit(onSignInPress)}
                                     disabled={loginMutation.isPending}
-                                    className="bg-blue-600 py-4 rounded-lg mt-6 mb-6"
+                                    className="bg-blue-600 py-4 rounded-lg mt-6 mb-4"
                                 >
                                     <Text className="text-white font-JakartaBold text-center text-base">
-                                        {loginMutation.isPending ? 'Signing In...' : 'Sign In'}
+                                        {loginMutation.isPending ? 'Đang đăng nhập...' : 'Đăng nhập'}
                                     </Text>
                                 </TouchableOpacity>
 
-                                {/* Or Divider */}
+                                {/* Link quên mật khẩu */}
+                                <View className="items-center mb-6">
+                                    <Link href="/(auth)/forgot-password" asChild>
+                                        <TouchableOpacity>
+                                            <Text className="text-blue-600 font-JakartaMedium">
+                                                Quên mật khẩu?
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </Link>
+                                </View>
+
+                                {/* Đường phân cách */}
                                 <View className="flex-row items-center mb-6">
                                     <View className="flex-1 h-px bg-gray-300" />
                                     <Text className="mx-4 text-gray-500 text-sm font-Jakarta">
-                                        or
+                                        hoặc
                                     </Text>
                                     <View className="flex-1 h-px bg-gray-300" />
                                 </View>
 
-                                {/* Social Login */}
-                                {/* <OAuth /> */}
-
-                                {/* Sign Up Link */}
+                                {/* Liên kết đăng ký */}
                                 <View className="items-center mb-8">
                                     <Link href="/sign-up" asChild>
                                         <TouchableOpacity>
                                             <Text className="text-gray-600 text-center font-Jakarta">
-                                                Don&apos;t have an account?{' '}
+                                                Chưa có tài khoản?{' '}
                                                 <Text className="text-blue-600 font-JakartaBold">
-                                                    Sign Up
+                                                    Đăng ký
                                                 </Text>
                                             </Text>
                                         </TouchableOpacity>
@@ -195,6 +195,22 @@ const SignIn = () => {
                     </View>
                 </TouchableWithoutFeedback>
             </KeyboardAvoidingView>
+
+            {/* Custom Modal */}
+            <CustomModal
+                isVisible={modalState.isVisible}
+                type={modalState.type}
+                title={modalState.title}
+                message={modalState.message}
+                buttonText={modalState.buttonText}
+                onConfirm={() => {
+                    hideModal()
+                    if (modalState.type === 'success') {
+                        loginMutation.reset()
+                        router.replace('/(root)/(tabs)/home')
+                    }
+                }}
+            />
         </FormProvider>
     )
 }
